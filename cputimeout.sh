@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Kill a command according to its cpu time
+
+if test $# -lt 2
+then
+    echo "Usage: $0 timeout command arg ..."
+    exit 126
+fi
+
+ulimit -t $1 || { echo "Error: cannot set timeout $1"; exit 126; }
+shift
+
+eval "$@"

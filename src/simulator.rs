@@ -1,22 +1,31 @@
-use std::fs::File;
+use std::{
+    fs::{File, canonicalize},
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
-use std::process::{Command, Stdio};
+use crate::{
+    Execute,
+    error::SimulatorError, SIMULATOR_TIME_LIMIT, SIMULATOR_MEMORY_LIMIT
+};
 
-use crate::error::SimulatorError;
 pub struct Simulator {}
 
-impl Simulator {
-    pub fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        Command::new("timeout".to_owned())
+impl Execute for Simulator {
+    fn run(&self, stdin: File, stdout: File, game_id: String) -> Result<std::process::Child, SimulatorError> {
+        let cpu_timeout = canonicalize(PathBuf::from("./cputimeout.sh")).unwrap().into_os_string();
+
+        Command::new(cpu_timeout.clone())
             .args([
-                "--signal=KILL",
-                "10",
+                SIMULATOR_TIME_LIMIT,
                 "docker",
                 "run",
-                "--memory=100m",
-                "--memory-swap=100m",
+                &format!("--memory={}", SIMULATOR_MEMORY_LIMIT),
+                &format!("--memory-swap={}", SIMULATOR_MEMORY_LIMIT),
                 "--cpus=1",
                 "--rm",
+                "--name",
+                format!("{}_simulator", game_id).as_str(),
                 "-i",
                 "ghcr.io/delta/codecharacter-simulator:latest",
             ])

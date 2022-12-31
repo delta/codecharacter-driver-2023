@@ -10,7 +10,7 @@ use cc_driver::{
     py,
     request::{GameRequest, Language},
     response::GameStatus,
-    simulator,
+    simulator, Execute,
 };
 use log::{error, info, LevelFilter};
 use log4rs::{
@@ -82,11 +82,11 @@ fn handler(game_request: GameRequest) -> GameStatus {
 
             let player_process = match game_request.language {
                 Language::CPP => cpp::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
+                    .run(p1_stdin, p1_stdout, game_request.game_id.clone()),
                 Language::PYTHON => py::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
+                    .run(p1_stdin, p1_stdout, game_request.game_id.clone()),
                 Language::JAVA => java::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
+                    .run(p1_stdin, p1_stdout, game_request.game_id.clone()),
             };
             let player_pid;
 
@@ -99,7 +99,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 }
             };
 
-            let sim_process = simulator::Simulator {}.run(p2_stdin, p2_stdout);
+            let sim_process = simulator::Simulator {}.run(p2_stdin, p2_stdout, game_request.game_id.clone());
             let sim_pid;
             match sim_process {
                 Ok(pid) => {

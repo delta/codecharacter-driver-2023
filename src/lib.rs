@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Read, os::unix::prelude::ExitStatusExt, process::Child};
+use std::{collections::HashMap, io::Read, os::unix::prelude::ExitStatusExt, process::Child, fs::File};
 
 use error::SimulatorError;
 use log::error;
@@ -20,8 +20,14 @@ const MAXLOGSIZE: usize = 200000;
 const SIGKILL: i32 = 9;
 const COMPILATION_TIME_LIMIT: &'static str = "5";
 const RUNTIME_TIME_LIMIT: &'static str = "10";
+const SIMULATOR_TIME_LIMIT: &'static str = "10";
 const COMPILATION_MEMORY_LIMIT: &'static str = "300m";
 const RUNTIME_MEMORY_LIMIT: &'static str = "100m";
+const SIMULATOR_MEMORY_LIMIT: &'static str = "100m";
+
+pub trait Execute {
+    fn run(&self, stdin: File, stdout: File, game_id: String) -> Result<Child, SimulatorError>;
+}
 
 pub fn handle_process(
     proc: Child,
