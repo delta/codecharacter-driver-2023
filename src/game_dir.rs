@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn dir_creation_and_deletion_check() {
         let game_id = "030af985-f4b5-4914-94d8-e559576449e3";
-        let match_dir_handle = GameDir::new(&game_id).unwrap();
+        let match_dir_handle = GameDir::new(game_id).unwrap();
 
         let full_path = match_dir_handle.get_path().to_owned();
 

@@ -3,25 +3,22 @@ use std::{collections::HashMap, io::Read, os::unix::prelude::ExitStatusExt, proc
 use error::SimulatorError;
 use log::error;
 use response::{GameResult, GameStatusEnum};
-pub mod cpp;
+pub mod runner;
 pub mod error;
 pub mod fifo;
 pub mod game_dir;
-pub mod java;
 pub mod mq;
-pub mod py;
 pub mod request;
 pub mod response;
-pub mod simulator;
 pub mod utils;
 
 // maximum size for log will be around 200KBs, everything after that is ignored
 const MAXLOGSIZE: usize = 200000;
 const SIGKILL: i32 = 9;
-const COMPILATION_TIME_LIMIT: &'static str = "5";
-const RUNTIME_TIME_LIMIT: &'static str = "10";
-const COMPILATION_MEMORY_LIMIT: &'static str = "300m";
-const RUNTIME_MEMORY_LIMIT: &'static str = "100m";
+const COMPILATION_TIME_LIMIT: &str = "5";
+const RUNTIME_TIME_LIMIT: &str = "10";
+const COMPILATION_MEMORY_LIMIT: &str = "300m";
+const RUNTIME_MEMORY_LIMIT: &str = "100m";
 
 pub fn handle_process(
     proc: Child,
@@ -43,7 +40,7 @@ pub fn handle_process(
             if out.status.success() {
                 match logs_extraction_result {
                     Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!("Error during log extraction: {}", e).to_owned(),
+                        format!("Error during log extraction: {}", e),
                     )),
                     Ok(logs) => Ok(logs),
                 }
@@ -60,7 +57,6 @@ pub fn handle_process(
                             "Program exited with non zero exit code followed by error during log extraction: {}",
                             e
                         )
-                        .to_owned(),
                     )),
                     Ok(logs) => Err(make_err(format!(
                         "Program exited with non zero exit code: {} ",
@@ -89,7 +85,7 @@ fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
             processing = true;
             match ln
                 .strip_prefix("TURN ")
-                .and_then(|x| usize::from_str_radix(x, 10).ok())
+                .and_then(|x| x.parse::<usize>().ok())
             {
                 Some(num) => cur_turn_no = num,
                 None => {
@@ -124,48 +120,41 @@ pub fn create_final_response(
     let mut destruction_percentage = 0.0;
 
     for ln in simulator_log.lines() {
-        //
         let ln = ln.trim();
         final_logs.push_str(ln);
         final_logs.push('\n');
 
         if ln.starts_with("TURN") {
-            match ln
+            if let Some(num) = ln
                 .strip_prefix("TURN, ")
-                .and_then(|x| usize::from_str_radix(x, 10).ok())
-            {
-                Some(num) => {
-                    if turnwise_logs.contains_key(&num) {
-                        for log in turnwise_logs.get(&num).unwrap().iter() {
-                            final_logs.push_str(&format!("PRINT, {}\n", log));
-                        }
+                .and_then(|x| x.parse::<usize>().ok()) {
+                if turnwise_logs.contains_key(&num) {
+                    for log in turnwise_logs.get(&num).unwrap().iter() {
+                        final_logs.push_str(&format!("PRINT, {}\n", log));
                     }
                 }
-                None => {}
             }
             continue;
         }
 
         if ln.starts_with("DESTRUCTION") {
-            match ln
+            if let Some(x) = ln
                 .strip_prefix("DESTRUCTION, ")
-                .and_then(|s| s.strip_suffix("%"))
+                .and_then(|s| s.strip_suffix('%'))
                 .and_then(|x| x.parse::<f64>().ok())
             {
-                Some(x) => {
-                    destruction_percentage = x;
-                }
-                None => {}
+                destruction_percentage = x;
             }
+
             continue;
         }
+
         if ln.starts_with("COINS") {
-            match ln
+            if let Some(x) = ln
                 .strip_prefix("COINS, ")
-                .and_then(|x| usize::from_str_radix(x, 10).ok())
+                .and_then(|x| x.parse::<usize>().ok())
             {
-                Some(x) => coins_left = x as u32,
-                None => {}
+                coins_left = x as u32;
             }
         }
     }
@@ -251,11 +240,11 @@ mod tests {
             "#;
         let mut expected_result = vec![
             (
-                1 as usize,
+                1_usize,
                 vec!["Bug is here".to_owned(), "No it's here".to_owned()],
             ),
             (
-                100 as usize,
+                100_usize,
                 vec!["Nope, it's been here the whole time".to_owned()],
             ),
         ];

@@ -27,7 +27,7 @@ impl Fifo {
         flags.remove(OFlag::O_NONBLOCK);
         fcntl::fcntl(fd, FcntlArg::F_SETFL(flags))
             .map_err(|e| SimulatorError::FifoCreationError(format!("{}", e)))?;
-        return Ok(());
+        Ok(())
     }
     fn setup_pipe(f: &str) -> Result<(File, File), SimulatorError> {
         Fifo::open_fifo(f)?;
@@ -86,10 +86,10 @@ mod fifo_tests {
         let mut buffer = vec![0; s1];
         let s2 = fin.read(&mut buffer).unwrap();
 
-        let string = String::from_utf8(buffer).unwrap().to_owned();
+        let string = String::from_utf8(buffer).unwrap();
 
         assert_eq!(s1, s2);
-        assert_eq!(string.clone(), "Hello World".to_owned());
+        assert_eq!(string, "Hello World".to_owned());
 
         println!("{}", string);
     }
@@ -105,11 +105,11 @@ mod fifo_tests {
         {
             let python_code = "import sys\nsys.stdout.write(sys.stdin.readline())";
             let mut temp_python_file = File::create("temp_py.py").unwrap();
-            temp_python_file.write(python_code.as_bytes()).unwrap();
+            temp_python_file.write_all(python_code.as_bytes()).unwrap();
         }
 
         match Command::new("python3")
-            .args(&["temp_py.py"])
+            .args(["temp_py.py"])
             .stdout(Stdio::piped())
             .stdin(fin)
             .spawn()
@@ -120,7 +120,7 @@ mod fifo_tests {
                 assert_eq!("Hello World", String::from_utf8(out.stdout).unwrap().trim());
             }
             Err(_) => {
-                assert!(false);
+                panic!();
             }
         }
         let _ = remove_file("temp_py.py");
