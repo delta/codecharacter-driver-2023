@@ -29,6 +29,7 @@ impl Executable for Runner {
                 &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
                 &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
                 "--cpus=1",
+                "--rm",
                 "--name",
                 &format!("{}_python_runner", self.game_id),
                 "-i",
@@ -54,12 +55,12 @@ impl Drop for Runner {
     fn drop(&mut self) {
         Command::new("docker")
             .args([
-                "rm",
+                "stop",
                 &format!("{}_python_runner", self.game_id)
             ])
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("Unable to remove containers");
+            .ok();
     }
 }
