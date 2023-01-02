@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cc_driver::{
-    runner::{cpp, java, py, simulator, Executable},
+    runner::{cpp, java, py, simulator, Executable, Run},
     create_error_response, create_executing_response,
     error::SimulatorError,
     fifo::Fifo,

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
-use super::Executable;
+use super::{Executable, Run};
 
 pub struct Runner {
     current_dir: String,
@@ -18,7 +18,7 @@ impl Runner {
     }
 }
 
-impl Executable for Runner {
+impl Run for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
         Command::new("timeout")
             .args([
@@ -64,3 +64,5 @@ impl Drop for Runner {
             .ok();
     }
 }
+
+impl Executable for Runner {}
