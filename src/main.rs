@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
 use cc_driver::{
-    cpp, create_error_response, create_executing_response,
+    runner::{cpp, java, py, simulator, Executable, Run},
+    create_error_response, create_executing_response,
     error::SimulatorError,
     fifo::Fifo,
     game_dir::GameDir,
-    java,
     mq::{consumer, Publisher},
-    py,
     request::{GameRequest, Language},
     response::GameStatus,
-    simulator,
 };
 use log::{error, info, LevelFilter};
 use log4rs::{
@@ -55,23 +53,20 @@ fn handler(game_request: GameRequest) -> GameStatus {
         ),
     };
 
-    match cc_driver::utils::make_copy(
+    if let Some(resp) = cc_driver::utils::make_copy(
         to_copy_dir,
         game_dir_handle.get_path(),
         &player_code_file,
         &game_request,
     ) {
-        Some(resp) => {
-            return resp;
-        }
-        _ => {}
+        return resp;
     }
 
-    let p1_in = format!("{}/p1_in", game_dir_handle.get_path()).to_owned();
-    let p2_in = format!("{}/p2_in", game_dir_handle.get_path()).to_owned();
+    let p1_in = format!("{}/p1_in", game_dir_handle.get_path());
+    let p2_in = format!("{}/p2_in", game_dir_handle.get_path());
 
-    let pipe1 = Fifo::new(p1_in.to_owned());
-    let pipe2 = Fifo::new(p2_in.to_owned());
+    let pipe1 = Fifo::new(p1_in);
+    let pipe2 = Fifo::new(p2_in);
 
     match (pipe1, pipe2) {
         (Ok(mut p1), Ok(mut p2)) => {
@@ -80,78 +75,77 @@ fn handler(game_request: GameRequest) -> GameStatus {
 
             cc_driver::utils::send_initial_input(vec![&p1_stdout, &p2_stdout], &game_request);
 
-            let player_process = match game_request.language {
-                Language::CPP => cpp::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
-                Language::PYTHON => py::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
-                Language::JAVA => java::Runner::new(format!("{}", game_dir_handle.get_path()))
-                    .run(p1_stdin, p1_stdout),
+            let runner: Box<dyn Executable> = match game_request.language {
+                Language::CPP => Box::new(
+                    cpp::Runner::new(
+                        game_dir_handle.get_path().to_string(),
+                        game_request.game_id.to_string())),
+                Language::PYTHON => Box::new(
+                    py::Runner::new(
+                        game_dir_handle.get_path().to_string(),
+                        game_request.game_id.to_string())),
+                Language::JAVA => Box::new(
+                    java::Runner::new(
+                        game_dir_handle.get_path().to_string(),
+                        game_request.game_id.to_string())),
             };
-            let player_pid;
 
-            match player_process {
-                Ok(pid) => {
-                    player_pid = pid;
-                }
+            let player_process = runner.run(p1_stdin, p1_stdout);
+
+            let player_pid = match player_process {
+                Ok(pid) => pid,
                 Err(err) => {
                     return create_error_response(&game_request, err);
                 }
             };
 
-            let sim_process = simulator::Simulator {}.run(p2_stdin, p2_stdout);
-            let sim_pid;
-            match sim_process {
-                Ok(pid) => {
-                    sim_pid = pid;
-                }
+            let simulator = simulator::Simulator::new(game_request.game_id.to_string());
+            let sim_process = simulator.run(p2_stdin, p2_stdout);
+
+            let sim_pid = match sim_process {
+                Ok(pid) => pid,
                 Err(err) => {
                     return create_error_response(&game_request, err);
                 }
             };
 
             let player_process_out =
-                cc_driver::handle_process(player_pid, true, |x| SimulatorError::RuntimeError(x));
+                cc_driver::handle_process(player_pid, true, SimulatorError::RuntimeError);
+
             if let Err(err) = player_process_out {
                 error!("Error from player.");
                 return create_error_response(&game_request, err);
             }
+
             let player_process_out = player_process_out.unwrap();
 
             let sim_process_out =
-                cc_driver::handle_process(sim_pid, false, |x| SimulatorError::RuntimeError(x));
+                cc_driver::handle_process(sim_pid, false, SimulatorError::RuntimeError);
+
             if let Err(err) = sim_process_out {
                 error!("Error from simulator.");
                 return create_error_response(&game_request, err);
             }
+
             let sim_process_out = sim_process_out.unwrap();
 
             info!("Successfully executed for game {}", game_request.game_id);
-            let response =
-                cc_driver::create_final_response(game_request, player_process_out, sim_process_out);
 
-            return response;
+            cc_driver::create_final_response(game_request, player_process_out, sim_process_out)
         }
 
         (Err(e), _) | (_, Err(e)) => {
-            return create_error_response(&game_request, e);
+            create_error_response(&game_request, e)
         }
     }
 }
 
 fn worker_fn(msg_receiver: crossbeam_channel::Receiver<GameRequest>, publisher: Arc<Publisher>) {
-    loop {
-        match msg_receiver.recv() {
-            Ok(req) => {
-                // publishing error means we can crash, something is wrong
-                publisher.publish(create_executing_response(&req)).unwrap();
-                let response = handler(req);
-                publisher.publish(response).unwrap();
-            }
-            Err(_) => {
-                break;
-            }
-        }
+    while let Ok(req) = msg_receiver.recv() {
+        // publishing error means we can crash, something is wrong
+        publisher.publish(create_executing_response(&req)).unwrap();
+        let response = handler(req);
+        publisher.publish(response).unwrap();
     }
 }
 
@@ -186,6 +180,7 @@ fn main() {
         "gameStatusUpdateQueue".to_owned(),
         worker_fn,
     );
+
     match res {
         Ok(_) => {}
         Err(e) => {

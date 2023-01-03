@@ -5,16 +5,22 @@ use std::{
 
 use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
+use super::{Executable, Run};
+
 pub struct Runner {
     current_dir: String,
+    game_id: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String) -> Self {
-        Runner { current_dir }
+    pub fn new(current_dir: String, game_id: String) -> Self {
+        Runner { current_dir, game_id }
     }
-    pub fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        Command::new("timeout".to_owned())
+}
+
+impl Run for Runner {
+    fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
+        Command::new("timeout")
             .args([
                 "--signal=KILL",
                 RUNTIME_TIME_LIMIT,
@@ -24,6 +30,8 @@ impl Runner {
                 &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
                 "--cpus=1",
                 "--rm",
+                "--name",
+                &format!("{}_python_runner", self.game_id),
                 "-i",
                 "-v",
                 format!("{}/run.py:/player_code/run.py", self.current_dir.as_str()).as_str(),
@@ -42,3 +50,19 @@ impl Runner {
             })
     }
 }
+
+impl Drop for Runner {
+    fn drop(&mut self) {
+        Command::new("docker")
+            .args([
+                "stop",
+                &format!("{}_python_runner", self.game_id)
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
+    }
+}
+
+impl Executable for Runner {}

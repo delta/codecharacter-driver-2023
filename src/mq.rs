@@ -116,7 +116,7 @@ impl Publisher {
         let body = serde_json::to_string(&response)
             .map_err(|e| SimulatorError::UnidentifiedError(format!("{}", e)))?;
         exchange
-            .publish(Publish::new(&body.as_bytes(), &self.queue_name))
+            .publish(Publish::new(body.as_bytes(), &self.queue_name))
             .map_err(|e| {
                 SimulatorError::UnidentifiedError(format!(
                     "Error in publishing to the queue[Publisher::publish]{}",
