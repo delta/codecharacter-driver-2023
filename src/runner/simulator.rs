@@ -55,7 +55,7 @@ impl Drop for Simulator {
                 &format!("{}_simulator", self.game_id),
             ])
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::null())
             .spawn()
             .ok();
     }

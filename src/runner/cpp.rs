@@ -94,7 +94,7 @@ impl Drop for Runner {
                 &format!("{}_cpp_runner", self.game_id),
             ])
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::null())
             .spawn()
             .ok();
     }

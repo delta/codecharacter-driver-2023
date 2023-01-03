@@ -59,7 +59,7 @@ impl Drop for Runner {
                 &format!("{}_python_runner", self.game_id)
             ])
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::null())
             .spawn()
             .ok();
     }
