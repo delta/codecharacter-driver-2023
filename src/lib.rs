@@ -1,8 +1,10 @@
-use std::{collections::HashMap, io::Read, os::unix::prelude::ExitStatusExt, process::Child};
+#![feature(linux_pidfd)]
+use std::{collections::HashMap, io::Read, process::{ChildStderr}};
 
-use error::SimulatorError;
+use error::{SimulatorError};
 use log::error;
 use response::{GameResult, GameStatusEnum};
+pub mod epoll;
 pub mod runner;
 pub mod error;
 pub mod fifo;
@@ -14,62 +16,73 @@ pub mod utils;
 
 // maximum size for log will be around 200KBs, everything after that is ignored
 const MAXLOGSIZE: usize = 200000;
-const SIGKILL: i32 = 9;
-const COMPILATION_TIME_LIMIT: &str = "5";
-const RUNTIME_TIME_LIMIT: &str = "10";
+const COMPILATION_TIME_LIMIT: &str = "50";
+const RUNTIME_TIME_LIMIT: &str = "100";
 const COMPILATION_MEMORY_LIMIT: &str = "300m";
 const RUNTIME_MEMORY_LIMIT: &str = "100m";
 
 pub fn handle_process(
-    proc: Child,
+    proc: &mut ChildStderr,
     is_player_process: bool,
-    make_err: fn(String) -> SimulatorError,
+    _make_err: fn(String) -> SimulatorError,
 ) -> Result<String, SimulatorError> {
-    match proc.wait_with_output() {
-        Ok(out) => {
+    println!("HERE");
+    // match proc.wait_with_output() {
+    //     Ok(out) => {
+        let stderr = proc;
+        // let mut stdout = proc.stdout.unwrap();
+            println!("here2");
             let logs_extraction_result: Result<String, std::io::Error> = if is_player_process {
                 let mut logs = String::new();
-                out.stderr
+                stderr
                     .take(MAXLOGSIZE as u64)
                     .read_to_string(&mut logs)
                     .map(|_| logs)
             } else {
-                String::from_utf8(out.stderr)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))
+                let mut buf = String::new();
+                let result = stderr.read_to_string(&mut buf)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")));
+                
+                if let Err(e) = result {
+                    Err(e)
+                } else {
+                    Ok(String::from(buf.as_str()))
+                }
             };
-            if out.status.success() {
+
+            // if out.status.success() {
                 match logs_extraction_result {
                     Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!("Error during log extraction: {}", e),
+                        format!("Error during log extraction: {e}"),
                     )),
                     Ok(logs) => Ok(logs),
                 }
-            } else {
-                if let Some(sig) = out.status.signal() {
-                    if sig == SIGKILL {
-                        return Err(SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_string()));
-                    }
-                }
+        //     } else {
+        //         if let Some(sig) = out.status.signal() {
+        //             if sig == SIGKILL {
+        //                 return Err(SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_string()));
+        //             }
+        //         }
 
-                match logs_extraction_result {
-                    Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!(
-                            "Program exited with non zero exit code followed by error during log extraction: {}",
-                            e
-                        )
-                    )),
-                    Ok(logs) => Err(make_err(format!(
-                        "Program exited with non zero exit code: {} ",
-                        logs
-                    ))),
-                }
-            }
-        }
-        Err(err) => Err(SimulatorError::UnidentifiedError(format!(
-            "Waiting on Child Failed: {}",
-            err
-        ))),
-    }
+        //         match logs_extraction_result {
+        //             Err(e) => Err(SimulatorError::UnidentifiedError(
+        //                 format!(
+        //                     "Program exited with non zero exit code followed by error during log extraction: {}",
+        //                     e
+        //                 )
+        //             )),
+        //             Ok(logs) => Err(make_err(format!(
+        //                 "Program exited with non zero exit code: {} ",
+        //                 logs
+        //             ))),
+        //         }
+        //     }
+        // // }
+    //     Err(err) => Err(SimulatorError::UnidentifiedError(format!(
+    //         "Waiting on Child Failed: {}",
+    //         err
+    //     ))),
+    // }
 }
 
 fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
@@ -130,7 +143,7 @@ pub fn create_final_response(
                 .and_then(|x| x.parse::<usize>().ok()) {
                 if turnwise_logs.contains_key(&num) {
                     for log in turnwise_logs.get(&num).unwrap().iter() {
-                        final_logs.push_str(&format!("PRINT, {}\n", log));
+                        final_logs.push_str(&format!("PRINT, {log}\n"));
                     }
                 }
             }
@@ -192,12 +205,12 @@ pub fn create_error_response(
             ("Unidentified Error. Contact the POCs!".to_owned(), e)
         }
         SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
+        SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
     };
 
     let error = error
         .lines()
-        .into_iter()
-        .map(|x| format!("ERRORS, {}", x))
+        .map(|x| format!("ERRORS, {x}"))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -209,8 +222,7 @@ pub fn create_error_response(
             coins_used: 0,
             has_errors: true,
             log: format!(
-                "ERRORS, ERROR TYPE: {}\nERRORS, ERROR LOG:\n{}\n",
-                err_type, error
+                "ERRORS, ERROR TYPE: {err_type}\nERRORS, ERROR LOG:\n{error}\n"
             ),
         }),
     }

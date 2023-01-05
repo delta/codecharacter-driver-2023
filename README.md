@@ -2,6 +2,11 @@
 
 1. Install [Rust](https://www.rust-lang.org/tools/install)
 
+2. Switch to Rust Nightly
+   ```
+   rustup install nightly && rustup default nightly
+   ```
+
 ## Setup
 
 1. Clone the repository

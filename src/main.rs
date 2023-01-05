@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use cc_driver::{
     runner::{cpp, java, py, simulator, Executable, Run},
@@ -8,7 +8,7 @@ use cc_driver::{
     game_dir::GameDir,
     mq::{consumer, Publisher},
     request::{GameRequest, Language},
-    response::GameStatus,
+    response::GameStatus, epoll::Epoll,
 };
 use log::{error, info, LevelFilter};
 use log4rs::{
@@ -19,6 +19,54 @@ use log4rs::{
     config::{Appender, Config, Root},
     filter::threshold::ThresholdFilter,
 };
+use nix::{sys::{wait::{waitpid, WaitStatus}, signal::{kill, Signal}}, unistd::Pid};
+
+fn handle_kill_event(pid: u32, _: u64, processes: &Vec<u32>) -> Result<(), SimulatorError> {
+    let exit_code = waitpid(Pid::from_raw(pid as i32), None);
+
+    if exit_code.is_err() {
+        println!("ERROR");
+    }
+
+    let exit_code = exit_code.unwrap();
+
+    println!("Exit code: {exit_code:?}");
+
+    if let WaitStatus::Signaled(_, Signal::SIGKILL, _) = exit_code {
+        // Exited by a SIGKILL kill the others
+        for process in processes {
+            println!("Killing: {process}");
+            let res = kill(Pid::from_raw(*process as i32), Signal::SIGKILL);
+
+            if let Err(r) = res {
+                println!("Error killing: {r}");
+            }
+        }
+
+        Err(SimulatorError::TimeOutError("Timeout".to_owned()))
+    } else if let WaitStatus::Exited(_, code) = exit_code {
+        if code != 0 {
+            println!("Exiting with error exit code: {code}");
+            // Exited by a SIGKILL kill the others
+            for process in processes {
+                println!("Killing: {process}");
+                let res = kill(Pid::from_raw(*process as i32), Signal::SIGKILL);
+    
+                if let Err(r) = res {
+                    println!("Error killing: {r}");
+                }
+            }
+    
+            Err(SimulatorError::RuntimeError("Exited with error".to_owned()))
+        } else {
+            println!("Everything went well");
+            // everything ends here
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
+}
 
 fn handler(game_request: GameRequest) -> GameStatus {
     info!(
@@ -92,7 +140,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
 
             let player_process = runner.run(p1_stdin, p1_stdout);
 
-            let player_pid = match player_process {
+            let mut player_pid = match player_process {
                 Ok(pid) => pid,
                 Err(err) => {
                     return create_error_response(&game_request, err);
@@ -109,8 +157,43 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 }
             };
 
+            println!("Creating process handler");
+            let mut event_handler = match Epoll::new() {
+                Ok(event_handler) => event_handler,
+                Err(err) => {
+                    return create_error_response(&game_request, err.into());
+                }
+            };
+
+            println!("Registering player process");
+            if let Err(err) = event_handler.register(&player_pid) {
+                return create_error_response(&game_request, err.into());
+            }
+
+            println!("Registering simulator process");
+            if let Err(err) = event_handler.register(&sim_pid) {
+                return create_error_response(&game_request, err.into());
+            }
+
+            println!("Waiting for event");
+            match event_handler.on_event(300_000_isize, handle_kill_event) {
+                Ok(out) => {
+                    if let Err(err) = out {
+                        println!("killed in on event");
+                        return create_error_response(&game_request, err)
+                    }
+
+                    // Since simulator never exits (successfully) before the player code, that case is not covered here.
+                    // The case where it exits with error is covered
+                }
+                Err(err) => {
+                    println!("Something went wrong with epolls");
+                    return create_error_response(&game_request, err.into())
+                }
+            };
+
             let player_process_out =
-                cc_driver::handle_process(player_pid, true, SimulatorError::RuntimeError);
+                cc_driver::handle_process(&mut player_pid.stderr.take().unwrap(), true, SimulatorError::RuntimeError);
 
             if let Err(err) = player_process_out {
                 error!("Error from player.");
@@ -118,9 +201,10 @@ fn handler(game_request: GameRequest) -> GameStatus {
             }
 
             let player_process_out = player_process_out.unwrap();
+            println!("{}", &player_process_out[0..100]);
 
             let sim_process_out =
-                cc_driver::handle_process(sim_pid, false, SimulatorError::RuntimeError);
+                cc_driver::handle_process(&mut sim_pid.stderr.unwrap(), false, SimulatorError::RuntimeError);
 
             if let Err(err) = sim_process_out {
                 error!("Error from simulator.");
@@ -128,6 +212,8 @@ fn handler(game_request: GameRequest) -> GameStatus {
             }
 
             let sim_process_out = sim_process_out.unwrap();
+
+            println!("{}", &sim_process_out[0..100]);
 
             info!("Successfully executed for game {}", game_request.game_id);
 
@@ -184,7 +270,7 @@ fn main() {
     match res {
         Ok(_) => {}
         Err(e) => {
-            println!("{}", e);
+            println!("{e}");
         }
     }
 }

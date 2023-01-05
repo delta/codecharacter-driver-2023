@@ -1,11 +1,11 @@
 use std::{
-    fs::File,
-    process::{Child, Command, Stdio},
+    fs::{File, canonicalize},
+    process::{Child, Command, Stdio}, path::PathBuf, os::linux::process::CommandExt,
 };
 
 use crate::{
-    error::SimulatorError, handle_process, COMPILATION_MEMORY_LIMIT, COMPILATION_TIME_LIMIT,
-    RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT,
+    error::SimulatorError, COMPILATION_MEMORY_LIMIT,
+    RUNTIME_MEMORY_LIMIT,
 };
 
 use super::{Executable, Run};
@@ -23,14 +23,13 @@ impl Runner {
 
 impl Run for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
-        let compile = Command::new("timeout")
+        let cpu_timeout = canonicalize(PathBuf::from("./cputimeout.sh")).unwrap().into_os_string();
+
+        let compile = Command::new("docker")
             .args([
-                "--signal=KILL",
-                COMPILATION_TIME_LIMIT,
-                "docker",
                 "run",
-                &format!("--memory={}", COMPILATION_MEMORY_LIMIT),
-                &format!("--memory-swap={}", COMPILATION_MEMORY_LIMIT),
+                &format!("--memory={COMPILATION_MEMORY_LIMIT}"),
+                &format!("--memory-swap={COMPILATION_MEMORY_LIMIT}"),
                 "--cpus=2",
                 "--rm",
                 "--name",
@@ -47,21 +46,25 @@ impl Run for Runner {
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn compilation command: {}",
-                    err
+                    "Couldnt spawn compilation command: {err}"
                 ))
             })?;
 
-        let _ = handle_process(compile, true, SimulatorError::CompilationError)?;
+        let out = compile.wait_with_output().unwrap();
+        if !out.status.success() {
+            let stderr = String::from_utf8(out.stderr).unwrap();
+            return Err(SimulatorError::CompilationError(stderr));
+        }
 
-        Command::new("timeout")
+        // let _ = handle_process(compile, true, SimulatorError::CompilationError)?;
+
+        Command::new(cpu_timeout)
             .args([
-                "--signal=KILL",
-                RUNTIME_TIME_LIMIT,
+                "1",
                 "docker",
                 "run",
-                &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
-                &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
+                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
                 "--rm",
                 "--name",
@@ -72,21 +75,21 @@ impl Run for Runner {
                 "ghcr.io/delta/codecharacter-cpp-runner:latest",
             ])
             .current_dir(&self.current_dir)
+            .create_pidfd(true)
             .stdin(stdin)
             .stdout(stdout)
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the C++ runner process: {}",
-                    err
-                ))
+                    "Couldnt spawn the C++ runner process: {err}"))
             })
     }
 }
 
 impl Drop for Runner {
     fn drop(&mut self) {
+        println!("Removing the cpp runner");
         Command::new("docker")
             .args([
                 "stop",

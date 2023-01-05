@@ -26,8 +26,8 @@ impl Run for Runner {
                 RUNTIME_TIME_LIMIT,
                 "docker",
                 "run",
-                &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
-                &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
+                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
                 "--rm",
                 "--name",
@@ -44,8 +44,7 @@ impl Run for Runner {
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the python runner process: {}",
-                    err
+                    "Couldnt spawn the python runner process: {err}"
                 ))
             })
     }

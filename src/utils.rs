@@ -17,7 +17,7 @@ pub fn copy_dir_all(
         let ty = entry.file_type()?;
         if ty.is_dir() {
             fs_extra::dir::copy(entry.path(), dst.as_ref(), &opt)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))?;
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
         } else {
             std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
         }
@@ -74,7 +74,7 @@ pub fn send_initial_input(fifos: Vec<&File>, game_request: &GameRequest) {
         writer.write_all("64 64\n".as_bytes()).unwrap();
         for row in game_request.map.iter() {
             for cell in row.iter() {
-                writer.write_all(format!("{} ", cell).as_bytes()).unwrap();
+                writer.write_all(format!("{cell} ").as_bytes()).unwrap();
             }
             writer.write_all("\n".as_bytes()).unwrap();
         }
@@ -91,8 +91,7 @@ pub fn make_copy(
         return Some(create_error_response(
             game_request,
             error::SimulatorError::UnidentifiedError(format!(
-                "Failed to copy player code boilerplate: {}",
-                e
+                "Failed to copy player code boilerplate: {e}"
             )),
         ));
     }
@@ -103,7 +102,7 @@ pub fn make_copy(
     }) {
         return Some(create_error_response(
             game_request,
-            error::SimulatorError::UnidentifiedError(format!("Failed to copy player code: {}", e)),
+            error::SimulatorError::UnidentifiedError(format!("Failed to copy player code: {e}")),
         ));
     }
     None

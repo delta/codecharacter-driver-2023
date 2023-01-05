@@ -53,12 +53,12 @@ pub fn consumer(
                         consumer.ack(delivery)?;
                     }
                     Err(e) => {
-                        eprintln!("{:?}", e);
+                        eprintln!("{e:?}");
                     }
                 }
             }
             other => {
-                println!("Consumer ended: {:?}", other);
+                println!("Consumer ended: {other:?}");
                 break;
             }
         }
@@ -77,15 +77,13 @@ impl Publisher {
     pub fn new(url: String, queue_name: String) -> Result<Self, SimulatorError> {
         let mut connection = Connection::insecure_open(&url).map_err(|e| {
             SimulatorError::UnidentifiedError(format!(
-                "Error in opening connection to publish queue [Connection::insecure_open]: {}",
-                e
+                "Error in opening connection to publish queue [Connection::insecure_open]: {e}"
             ))
         })?;
 
         let channel = connection.open_channel(None).map_err(|e| {
             SimulatorError::UnidentifiedError(format!(
-                "Error in opening channel [Connection::open_channel]: {}",
-                e
+                "Error in opening channel [Connection::open_channel]: {e}"
             ))
         })?;
 
@@ -99,8 +97,7 @@ impl Publisher {
             )
             .map_err(|e| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Error in publishing to the queue [Publisher::new]: {}",
-                    e
+                    "Error in publishing to the queue [Publisher::new]: {e}"
                 ))
             })?;
 
@@ -114,13 +111,12 @@ impl Publisher {
         let channel = self.channel.lock().unwrap();
         let exchange = Exchange::direct(&channel);
         let body = serde_json::to_string(&response)
-            .map_err(|e| SimulatorError::UnidentifiedError(format!("{}", e)))?;
+            .map_err(|e| SimulatorError::UnidentifiedError(format!("{e}")))?;
         exchange
             .publish(Publish::new(body.as_bytes(), &self.queue_name))
             .map_err(|e| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Error in publishing to the queue[Publisher::publish]{}",
-                    e
+                    "Error in publishing to the queue[Publisher::publish]{e}"
                 ))
             })?;
         Ok(())

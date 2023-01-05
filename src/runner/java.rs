@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    error::SimulatorError, handle_process, COMPILATION_MEMORY_LIMIT, COMPILATION_TIME_LIMIT,
+    error::SimulatorError, COMPILATION_MEMORY_LIMIT, COMPILATION_TIME_LIMIT,
     RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT,
 };
 
@@ -23,14 +23,14 @@ impl Runner {
 
 impl Run for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
-        let compile = Command::new("timeout")
+        let _compile = Command::new("timeout")
             .args([
                 "--signal=KILL",
                 COMPILATION_TIME_LIMIT,
                 "docker",
                 "run",
-                &format!("--memory={}", COMPILATION_MEMORY_LIMIT),
-                &format!("--memory-swap={}", COMPILATION_MEMORY_LIMIT),
+                &format!("--memory={COMPILATION_MEMORY_LIMIT}"),
+                &format!("--memory-swap={COMPILATION_MEMORY_LIMIT}"),
                 "--cpus=1.5",
                 "--rm",
                 "--name",
@@ -51,12 +51,11 @@ impl Run for Runner {
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn compilation command: {}",
-                    err
+                    "Couldnt spawn compilation command: {err}"
                 ))
             })?;
-
-        let _ = handle_process(compile, true, SimulatorError::CompilationError)?;
+            
+        // let _ = handle_process(compile, true, SimulatorError::CompilationError)?;
 
         Command::new("timeout")
             .args([
@@ -64,8 +63,8 @@ impl Run for Runner {
                 RUNTIME_TIME_LIMIT,
                 "docker",
                 "run",
-                &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
-                &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
+                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
                 "--rm",
                 "--name",
@@ -82,8 +81,7 @@ impl Run for Runner {
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the java runner process: {}",
-                    err
+                    "Couldnt spawn the java runner process: {err}"
                 ))
             })
     }

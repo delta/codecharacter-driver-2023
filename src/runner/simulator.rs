@@ -1,8 +1,13 @@
-use std::fs::File;
+use std::fs::{File, canonicalize};
 
+use std::os::linux::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-use crate::{RUNTIME_TIME_LIMIT, RUNTIME_MEMORY_LIMIT};
+
+
+
+use crate::{RUNTIME_MEMORY_LIMIT};
 use crate::error::SimulatorError;
 
 use super::{Executable, Run};
@@ -19,29 +24,30 @@ impl Simulator {
 
 impl Run for Simulator {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        Command::new("timeout")
+        let cpu_timeout = canonicalize(PathBuf::from("./cputimeout.sh")).unwrap().into_os_string();
+
+        Command::new(cpu_timeout)
             .args([
-                "--signal=KILL",
-                RUNTIME_TIME_LIMIT,
+                "100",
                 "docker",
                 "run",
-                &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
-                &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
+                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
-                "--rm",
+                "--rm", 
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "-i",
-                "ghcr.io/delta/codecharacter-simulator:latest",
+                "exit_image",
             ])
+            .create_pidfd(true)
             .stdin(stdin)
             .stdout(stdout)
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the simulator process: {}",
-                    err
+                    "Couldnt spawn the simulator process: {err}"
                 ))
             })
     }
@@ -49,13 +55,14 @@ impl Run for Simulator {
 
 impl Drop for Simulator {
     fn drop(&mut self) {
+        println!("Removing simulator");
         Command::new("docker")
             .args([
                 "stop",
                 &format!("{}_simulator", self.game_id),
             ])
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .ok();
     }
