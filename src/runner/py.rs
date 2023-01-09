@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    process::{Command, Stdio},
+    process::{Command, Stdio}, os::linux::process::CommandExt,
 };
 
 use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
@@ -20,15 +20,14 @@ impl Runner {
 
 impl Run for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        Command::new("timeout")
+        Command::new("docker")
             .args([
-                "--signal=KILL",
-                RUNTIME_TIME_LIMIT,
-                "docker",
                 "run",
                 &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
                 &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
+                "--ulimit",
+                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
                 "--rm",
                 "--name",
                 &format!("{}_python_runner", self.game_id),
@@ -37,6 +36,7 @@ impl Run for Runner {
                 format!("{}/run.py:/player_code/run.py", self.current_dir.as_str()).as_str(),
                 "ghcr.io/delta/codecharacter-python-runner:latest",
             ])
+            .create_pidfd(true)
             .current_dir(&self.current_dir)
             .stdin(stdin)
             .stdout(stdout)

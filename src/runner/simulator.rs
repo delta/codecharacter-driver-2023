@@ -1,13 +1,9 @@
-use std::fs::{File, canonicalize};
+use std::fs::File;
 
 use std::os::linux::process::CommandExt;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-
-
-
-use crate::{RUNTIME_MEMORY_LIMIT};
+use crate::{RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 use crate::error::SimulatorError;
 
 use super::{Executable, Run};
@@ -24,21 +20,20 @@ impl Simulator {
 
 impl Run for Simulator {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        let cpu_timeout = canonicalize(PathBuf::from("./cputimeout.sh")).unwrap().into_os_string();
 
-        Command::new(cpu_timeout)
+        Command::new("docker")
             .args([
-                "100",
-                "docker",
                 "run",
                 &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
                 &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
+                "--ulimit",
+                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
                 "--rm", 
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "-i",
-                "exit_image",
+                "ghcr.io/delta/codecharacter-simulator:latest",
             ])
             .create_pidfd(true)
             .stdin(stdin)
@@ -55,7 +50,6 @@ impl Run for Simulator {
 
 impl Drop for Simulator {
     fn drop(&mut self) {
-        println!("Removing simulator");
         Command::new("docker")
             .args([
                 "stop",

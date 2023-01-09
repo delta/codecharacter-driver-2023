@@ -1,10 +1,10 @@
 #![feature(linux_pidfd)]
-use std::{collections::HashMap, io::Read, process::{ChildStderr}};
+use std::collections::HashMap;
 
 use error::{SimulatorError};
 use log::error;
 use response::{GameResult, GameStatusEnum};
-pub mod epoll;
+pub mod poll;
 pub mod runner;
 pub mod error;
 pub mod fifo;
@@ -16,74 +16,11 @@ pub mod utils;
 
 // maximum size for log will be around 200KBs, everything after that is ignored
 const MAXLOGSIZE: usize = 200000;
-const COMPILATION_TIME_LIMIT: &str = "50";
-const RUNTIME_TIME_LIMIT: &str = "100";
+const COMPILATION_TIME_LIMIT: &str = "5";
+const RUNTIME_TIME_LIMIT: &str = "10";
 const COMPILATION_MEMORY_LIMIT: &str = "300m";
 const RUNTIME_MEMORY_LIMIT: &str = "100m";
-
-pub fn handle_process(
-    proc: &mut ChildStderr,
-    is_player_process: bool,
-    _make_err: fn(String) -> SimulatorError,
-) -> Result<String, SimulatorError> {
-    println!("HERE");
-    // match proc.wait_with_output() {
-    //     Ok(out) => {
-        let stderr = proc;
-        // let mut stdout = proc.stdout.unwrap();
-            println!("here2");
-            let logs_extraction_result: Result<String, std::io::Error> = if is_player_process {
-                let mut logs = String::new();
-                stderr
-                    .take(MAXLOGSIZE as u64)
-                    .read_to_string(&mut logs)
-                    .map(|_| logs)
-            } else {
-                let mut buf = String::new();
-                let result = stderr.read_to_string(&mut buf)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")));
-                
-                if let Err(e) = result {
-                    Err(e)
-                } else {
-                    Ok(String::from(buf.as_str()))
-                }
-            };
-
-            // if out.status.success() {
-                match logs_extraction_result {
-                    Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!("Error during log extraction: {e}"),
-                    )),
-                    Ok(logs) => Ok(logs),
-                }
-        //     } else {
-        //         if let Some(sig) = out.status.signal() {
-        //             if sig == SIGKILL {
-        //                 return Err(SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_string()));
-        //             }
-        //         }
-
-        //         match logs_extraction_result {
-        //             Err(e) => Err(SimulatorError::UnidentifiedError(
-        //                 format!(
-        //                     "Program exited with non zero exit code followed by error during log extraction: {}",
-        //                     e
-        //                 )
-        //             )),
-        //             Ok(logs) => Err(make_err(format!(
-        //                 "Program exited with non zero exit code: {} ",
-        //                 logs
-        //             ))),
-        //         }
-        //     }
-        // // }
-    //     Err(err) => Err(SimulatorError::UnidentifiedError(format!(
-    //         "Waiting on Child Failed: {}",
-    //         err
-    //     ))),
-    // }
-}
+pub const EPOLL_WAIT_TIMEOUT: isize = 30_000;
 
 fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
     let mut turnwise_logs = HashMap::new();

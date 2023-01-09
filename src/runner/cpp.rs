@@ -1,11 +1,11 @@
 use std::{
-    fs::{File, canonicalize},
-    process::{Child, Command, Stdio}, path::PathBuf, os::linux::process::CommandExt,
+    fs::File,
+    process::{Child, Command, Stdio}, os::linux::process::CommandExt,
 };
 
 use crate::{
     error::SimulatorError, COMPILATION_MEMORY_LIMIT,
-    RUNTIME_MEMORY_LIMIT,
+    RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT, COMPILATION_TIME_LIMIT,
 };
 
 use super::{Executable, Run};
@@ -23,14 +23,14 @@ impl Runner {
 
 impl Run for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
-        let cpu_timeout = canonicalize(PathBuf::from("./cputimeout.sh")).unwrap().into_os_string();
-
         let compile = Command::new("docker")
             .args([
                 "run",
                 &format!("--memory={COMPILATION_MEMORY_LIMIT}"),
                 &format!("--memory-swap={COMPILATION_MEMORY_LIMIT}"),
                 "--cpus=2",
+                "--ulimit",
+                &format!("cpu={COMPILATION_TIME_LIMIT}:{COMPILATION_TIME_LIMIT}"),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_compiler", self.game_id),
@@ -50,22 +50,23 @@ impl Run for Runner {
                 ))
             })?;
 
-        let out = compile.wait_with_output().unwrap();
+        let out = compile.wait_with_output().map_err(|err| {
+            SimulatorError::UnidentifiedError(format!("Unable to wait for compilation to finish, {err}"))
+        })?;
+
         if !out.status.success() {
             let stderr = String::from_utf8(out.stderr).unwrap();
             return Err(SimulatorError::CompilationError(stderr));
         }
 
-        // let _ = handle_process(compile, true, SimulatorError::CompilationError)?;
-
-        Command::new(cpu_timeout)
+        Command::new("docker")
             .args([
-                "1",
-                "docker",
                 "run",
                 &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
                 &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
+                "--ulimit",
+                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_runner", self.game_id),
@@ -89,7 +90,6 @@ impl Run for Runner {
 
 impl Drop for Runner {
     fn drop(&mut self) {
-        println!("Removing the cpp runner");
         Command::new("docker")
             .args([
                 "stop",

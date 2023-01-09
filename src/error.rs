@@ -14,6 +14,7 @@ pub enum EpollError {
     PidFdError(String),
     EpollRegisterError(String),
     EpollWaitError(String),
+    EpollProcessNotFound(String),
 }
 
 impl From<EpollError> for SimulatorError {
@@ -23,6 +24,7 @@ impl From<EpollError> for SimulatorError {
             EpollError::PidFdError(e) => SimulatorError::EpollError(e),
             EpollError::EpollRegisterError(e) => SimulatorError::EpollError(e),
             EpollError::EpollWaitError(e) => SimulatorError::EpollError(e),
+            EpollError::EpollProcessNotFound(e) => SimulatorError::EpollError(e),
         }
     }
 }

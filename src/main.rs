@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use cc_driver::{
     runner::{cpp, java, py, simulator, Executable, Run},
@@ -8,9 +8,9 @@ use cc_driver::{
     game_dir::GameDir,
     mq::{consumer, Publisher},
     request::{GameRequest, Language},
-    response::GameStatus, epoll::Epoll,
+    response::GameStatus, EPOLL_WAIT_TIMEOUT, poll::{epoll::Epoll, process::{ProcessOutput, Files, Process, ProcessType}},
 };
-use log::{error, info, LevelFilter};
+use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -19,52 +19,61 @@ use log4rs::{
     config::{Appender, Config, Root},
     filter::threshold::ThresholdFilter,
 };
-use nix::{sys::{wait::{waitpid, WaitStatus}, signal::{kill, Signal}}, unistd::Pid};
+use nix::sys::epoll::EpollFlags;
 
-fn handle_kill_event(pid: u32, _: u64, processes: &Vec<u32>) -> Result<(), SimulatorError> {
-    let exit_code = waitpid(Pid::from_raw(pid as i32), None);
+fn handle_event(event_handler: &mut Epoll) -> Result<Option<ProcessOutput>, SimulatorError> {
+    let (event, file) = match event_handler
+        .poll(EPOLL_WAIT_TIMEOUT)
+        .map_err(SimulatorError::from)? {
+        Some(res) => res,
+        None => return Ok(None)
+    };
 
-    if exit_code.is_err() {
-        println!("ERROR");
-    }
+    match file {
+        Files::Process(_) => {
+            let fd = event.data();
+            
+            let mut proc = event_handler
+                .unregister(fd)
+                .map_err(SimulatorError::from)?
+                .0.unwrap();
 
-    let exit_code = exit_code.unwrap();
+            let exit_status = match proc.wait() {
+                Ok(status) => status,
+                Err(err) => return Err(err)
+            };
 
-    println!("Exit code: {exit_code:?}");
-
-    if let WaitStatus::Signaled(_, Signal::SIGKILL, _) = exit_code {
-        // Exited by a SIGKILL kill the others
-        for process in processes {
-            println!("Killing: {process}");
-            let res = kill(Pid::from_raw(*process as i32), Signal::SIGKILL);
-
-            if let Err(r) = res {
-                println!("Error killing: {r}");
+            if exit_status.success() {
+                return Ok(None);
             }
-        }
 
-        Err(SimulatorError::TimeOutError("Timeout".to_owned()))
-    } else if let WaitStatus::Exited(_, code) = exit_code {
-        if code != 0 {
-            println!("Exiting with error exit code: {code}");
-            // Exited by a SIGKILL kill the others
-            for process in processes {
-                println!("Killing: {process}");
-                let res = kill(Pid::from_raw(*process as i32), Signal::SIGKILL);
-    
-                if let Err(r) = res {
-                    println!("Error killing: {r}");
+            event_handler
+                .clear_processes()
+                .iter_mut()
+                .for_each(|p| p.kill());
+
+            Err(match exit_status.code() {
+                // 137 => Stands for container killing itself (by SIGKILL) that will be due to contraint provided
+                None | Some(137) => SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_owned()),
+                Some(code) => SimulatorError::RuntimeError(format!("Program exited with non zero exit code: {code}")),
+            })
+        },
+        Files::StdErr(output) => {
+            match event.events() {
+                EpollFlags::EPOLLHUP => {
+                    let output= event_handler
+                        .unregister(event.data())
+                        .map_err(SimulatorError::from)?
+                        .1.unwrap();
+
+                    Ok(Some(output))
+                }
+                _ => {
+                    output.read_to_string()?;
+                    Ok(None)
                 }
             }
-    
-            Err(SimulatorError::RuntimeError("Exited with error".to_owned()))
-        } else {
-            println!("Everything went well");
-            // everything ends here
-            Ok(())
         }
-    } else {
-        Ok(())
     }
 }
 
@@ -138,85 +147,61 @@ fn handler(game_request: GameRequest) -> GameStatus {
                         game_request.game_id.to_string())),
             };
 
-            let player_process = runner.run(p1_stdin, p1_stdout);
+            let intialize = || -> Result<Epoll, SimulatorError> {
+                let mut player_process = runner.run(p1_stdin, p1_stdout)?;
+                let simulator = simulator::Simulator::new(game_request.game_id.to_string());
+                let mut sim_process = simulator.run(p2_stdin, p2_stdout)?;
 
-            let mut player_pid = match player_process {
-                Ok(pid) => pid,
-                Err(err) => {
-                    return create_error_response(&game_request, err);
-                }
+                let player_stderr = player_process.stderr.take().unwrap();
+                let sim_stderr = sim_process.stderr.take().unwrap();
+
+                let player_process = Process::new(player_process, ProcessType::Runner);
+                let sim_process = Process::new(sim_process, ProcessType::Simulator);
+                let player_output = ProcessOutput::new(player_stderr, ProcessType::Runner);
+                let sim_output = ProcessOutput::new(sim_stderr, ProcessType::Simulator);
+
+                let player = Files::Process(player_process);
+                let player_output = Files::StdErr(player_output);
+                let sim = Files::Process(sim_process);
+                let sim_output = Files::StdErr(sim_output);
+
+                let mut event_handler: Epoll = Epoll::new()
+                    .map_err(SimulatorError::from)?;
+
+                event_handler.register(player).map_err(SimulatorError::from)?;
+                event_handler.register(player_output).map_err(SimulatorError::from)?;
+                event_handler.register(sim).map_err(SimulatorError::from)?;
+                event_handler.register(sim_output).map_err(SimulatorError::from)?;
+
+                Ok(event_handler)
             };
 
-            let simulator = simulator::Simulator::new(game_request.game_id.to_string());
-            let sim_process = simulator.run(p2_stdin, p2_stdout);
-
-            let sim_pid = match sim_process {
-                Ok(pid) => pid,
-                Err(err) => {
-                    return create_error_response(&game_request, err);
-                }
+            let mut event_handler = match intialize() {
+                Ok(handler) => handler,
+                Err(err) => return create_error_response(&game_request, err),
             };
 
-            println!("Creating process handler");
-            let mut event_handler = match Epoll::new() {
-                Ok(event_handler) => event_handler,
-                Err(err) => {
-                    return create_error_response(&game_request, err.into());
+            let mut outputs = vec![];
+
+            while !event_handler.is_empty() {
+                let result = handle_event(&mut event_handler);
+
+                match result {
+                    Ok(Some(process_output)) => outputs.push(process_output),
+                    Err(err) => return create_error_response(&game_request, err),
+                    _ => {}
                 }
+            }
+
+            let process1 = outputs.remove(0);
+            let process2 = outputs.remove(0);
+
+            let (player_process_out, sim_process_out) = match process1.process_type() {
+                ProcessType::Runner => (process1.output(), process2.output()),
+                ProcessType::Simulator => (process2.output(), process1.output()),
             };
-
-            println!("Registering player process");
-            if let Err(err) = event_handler.register(&player_pid) {
-                return create_error_response(&game_request, err.into());
-            }
-
-            println!("Registering simulator process");
-            if let Err(err) = event_handler.register(&sim_pid) {
-                return create_error_response(&game_request, err.into());
-            }
-
-            println!("Waiting for event");
-            match event_handler.on_event(300_000_isize, handle_kill_event) {
-                Ok(out) => {
-                    if let Err(err) = out {
-                        println!("killed in on event");
-                        return create_error_response(&game_request, err)
-                    }
-
-                    // Since simulator never exits (successfully) before the player code, that case is not covered here.
-                    // The case where it exits with error is covered
-                }
-                Err(err) => {
-                    println!("Something went wrong with epolls");
-                    return create_error_response(&game_request, err.into())
-                }
-            };
-
-            let player_process_out =
-                cc_driver::handle_process(&mut player_pid.stderr.take().unwrap(), true, SimulatorError::RuntimeError);
-
-            if let Err(err) = player_process_out {
-                error!("Error from player.");
-                return create_error_response(&game_request, err);
-            }
-
-            let player_process_out = player_process_out.unwrap();
-            println!("{}", &player_process_out[0..100]);
-
-            let sim_process_out =
-                cc_driver::handle_process(&mut sim_pid.stderr.unwrap(), false, SimulatorError::RuntimeError);
-
-            if let Err(err) = sim_process_out {
-                error!("Error from simulator.");
-                return create_error_response(&game_request, err);
-            }
-
-            let sim_process_out = sim_process_out.unwrap();
-
-            println!("{}", &sim_process_out[0..100]);
 
             info!("Successfully executed for game {}", game_request.game_id);
-
             cc_driver::create_final_response(game_request, player_process_out, sim_process_out)
         }
 
