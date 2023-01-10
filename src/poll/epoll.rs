@@ -38,6 +38,7 @@ impl<T: Pollable> EpollGeneric<T> {
     pub fn get_registered_fds(&self) -> &HashMap<u64, T> {
         &self.fds
     }
+
     pub fn is_empty(&self) -> bool {
         self.fds.is_empty()
     }
@@ -70,14 +71,13 @@ impl<T: Pollable> EpollGeneric<T> {
 
     pub fn unregister(&mut self, fd: u64) -> Result<T, EpollError> {
         if !self.fds.contains_key(&fd) {
-            // change message
             return Err(EpollError::EpollFdError(
-                "Fd not found in interest list".to_owned(),
+                "Fd is not registered for epoll".to_owned(),
             ));
         }
         self.unregister_fd(fd as i32)?;
         self.fds.remove(&fd).ok_or(EpollError::EpollFdError(
-            "Fd not found in interest list".to_owned(),
+            "Fd is not registered for epoll".to_owned(),
         ))
     }
 
@@ -90,7 +90,7 @@ impl<T: Pollable> EpollGeneric<T> {
         let event_count = epoll_wait(self.epoll_fd, &mut events, timeout).map_err(|_| {
             EpollError::EpollWaitError("Unable to listen for epoll events".to_owned())
         })?;
-        Ok(events[..event_count].iter().cloned().collect())
+        Ok(events[..event_count].to_vec())
     }
     pub fn process_event(&mut self, event: EpollEvent) -> Result<CallbackMessage, SimulatorError> {
         let fd = event.data();

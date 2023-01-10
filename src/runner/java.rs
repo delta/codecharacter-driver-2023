@@ -1,11 +1,12 @@
 use std::{
     fs::File,
-    process::{Child, Command, Stdio}, os::linux::process::CommandExt,
+    os::linux::process::CommandExt,
+    process::{Child, Command, Stdio},
 };
 
 use crate::{
-    error::SimulatorError, COMPILATION_MEMORY_LIMIT,
-    RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT, COMPILATION_TIME_LIMIT,
+    error::SimulatorError, COMPILATION_MEMORY_LIMIT, COMPILATION_TIME_LIMIT, RUNTIME_MEMORY_LIMIT,
+    RUNTIME_TIME_LIMIT,
 };
 
 use super::{Executable, Run};
@@ -17,7 +18,10 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(current_dir: String, game_id: String) -> Self {
-        Runner { current_dir, game_id }
+        Runner {
+            current_dir,
+            game_id,
+        }
     }
 }
 
@@ -55,7 +59,9 @@ impl Run for Runner {
             })?;
 
         let out = compile.wait_with_output().map_err(|err| {
-            SimulatorError::UnidentifiedError(format!("Unable to wait for compilation to finish, {err}"))
+            SimulatorError::UnidentifiedError(format!(
+                "Unable to wait for compilation to finish, {err}"
+            ))
         })?;
 
         if !out.status.success() {
@@ -99,7 +105,7 @@ impl Drop for Runner {
             .args([
                 "stop",
                 &format!("{}_java_compiler", self.game_id),
-                &format!("{}_java_runner", self.game_id)
+                &format!("{}_java_runner", self.game_id),
             ])
             .stdout(Stdio::null())
             .stderr(Stdio::null())

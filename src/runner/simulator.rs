@@ -3,13 +3,13 @@ use std::fs::File;
 use std::os::linux::process::CommandExt;
 use std::process::{Command, Stdio};
 
-use crate::{RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 use crate::error::SimulatorError;
+use crate::{RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
 use super::{Executable, Run};
 
 pub struct Simulator {
-    game_id: String
+    game_id: String,
 }
 
 impl Simulator {
@@ -20,7 +20,6 @@ impl Simulator {
 
 impl Run for Simulator {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-
         Command::new("docker")
             .args([
                 "run",
@@ -29,7 +28,7 @@ impl Run for Simulator {
                 "--cpus=1",
                 "--ulimit",
                 &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
-                "--rm", 
+                "--rm",
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "-i",
@@ -51,10 +50,7 @@ impl Run for Simulator {
 impl Drop for Simulator {
     fn drop(&mut self) {
         Command::new("docker")
-            .args([
-                "stop",
-                &format!("{}_simulator", self.game_id),
-            ])
+            .args(["stop", &format!("{}_simulator", self.game_id)])
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()

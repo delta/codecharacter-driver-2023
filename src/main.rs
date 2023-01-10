@@ -7,7 +7,7 @@ use cc_driver::{
     game_dir::GameDir,
     mq::{consumer, Publisher},
     poll::{
-        epoll::{CallbackMessage, Epoll, EpollGeneric},
+        epoll::{CallbackMessage, EpollGeneric},
         epoll_entry::{EpollEntryType, Process, ProcessOutput, ProcessType},
     },
     request::{GameRequest, Language},
@@ -26,69 +26,7 @@ use log4rs::{
 };
 use nix::sys::epoll::EpollFlags;
 
-fn handle_event(event_handler: &mut Epoll) -> Result<Option<ProcessOutput>, SimulatorError> {
-    let (event, file) = match event_handler
-        .poll(EPOLL_WAIT_TIMEOUT)
-        .map_err(SimulatorError::from)?
-    {
-        Some(res) => res,
-        None => return Ok(None),
-    };
-
-    match file {
-        EpollEntryType::Process(_) => {
-            let fd = event.data();
-
-            let mut proc = event_handler
-                .unregister(fd)
-                .map_err(SimulatorError::from)?
-                .0
-                .unwrap();
-
-            let exit_status = match proc.wait() {
-                Ok(status) => status,
-                Err(err) => return Err(err),
-            };
-
-            if exit_status.success() {
-                return Ok(None);
-            }
-
-            event_handler
-                .clear_processes()
-                .iter_mut()
-                .for_each(|p| p.kill());
-
-            Err(match exit_status.code() {
-                // 137 => Stands for container killing itself (by SIGKILL) that will be due to contraint provided
-                None | Some(137) => SimulatorError::TimeOutError(
-                    "Process took longer than the specified time to execute, so it was killed"
-                        .to_owned(),
-                ),
-                Some(code) => SimulatorError::RuntimeError(format!(
-                    "Program exited with non zero exit code: {code}"
-                )),
-            })
-        }
-        EpollEntryType::StdErr(output) => match event.events() {
-            EpollFlags::EPOLLHUP => {
-                let output = event_handler
-                    .unregister(event.data())
-                    .map_err(SimulatorError::from)?
-                    .1
-                    .unwrap();
-
-                Ok(Some(output))
-            }
-            _ => {
-                output.read_to_string()?;
-                Ok(None)
-            }
-        },
-    }
-}
-
-fn handle_event_2(
+fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
 ) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
     let events = epoll_handle.poll(EPOLL_WAIT_TIMEOUT, epoll_handle.get_registered_fds().len())?;
@@ -100,7 +38,7 @@ fn handle_event_2(
                 let entry = epoll_handle.unregister(fd as u64)?;
                 res.push(match entry {
                     EpollEntryType::Process(_) => unreachable!(),
-                    EpollEntryType::StdErr(o) => Some(o),
+                    EpollEntryType::StdErr(output) => Some(output),
                 });
             }
             CallbackMessage::HandleExplicitly(fd) => {
@@ -130,7 +68,7 @@ fn handle_event_2(
                             });
 
                             return Err(match exit_status.code() {
-                            // 137 => Stands for container killing itself (by SIGKILL) 
+                            // 137 => Stands for container killing itself (by SIGKILL)
                             // that will be due to contraint provided
                             None | Some(137) => SimulatorError::TimeOutError(
                                 "Process took longer than the specified time to execute, so it was killed"
@@ -222,7 +160,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 )),
             };
 
-            let intialize = || -> Result<_, SimulatorError> {
+            let initialize = || -> Result<_, SimulatorError> {
                 let mut player_process = runner.run(p1_stdin, p1_stdout)?;
                 let simulator = simulator::Simulator::new(game_request.game_id.to_string());
                 let mut sim_process = simulator.run(p2_stdin, p2_stdout)?;
@@ -259,7 +197,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 Ok(event_handler)
             };
 
-            let mut event_handler = match intialize() {
+            let mut event_handler = match initialize() {
                 Ok(handler) => handler,
                 Err(err) => return create_error_response(&game_request, err),
             };
@@ -267,14 +205,10 @@ fn handler(game_request: GameRequest) -> GameStatus {
             let mut outputs: Vec<ProcessOutput> = vec![];
 
             while !event_handler.is_empty() {
-                let result = handle_event_2(&mut event_handler);
+                let result = handle_event(&mut event_handler);
                 match result {
                     Ok(processing_outputs) => {
-                        for output in processing_outputs {
-                            if let Some(o) = output {
-                                outputs.push(o);
-                            }
-                        }
+                        outputs.extend(processing_outputs.into_iter().flatten())
                     }
                     Err(err) => return create_error_response(&game_request, err),
                 }

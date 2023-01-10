@@ -1,6 +1,7 @@
 use std::{
     fs::File,
-    process::{Command, Stdio}, os::linux::process::CommandExt,
+    os::linux::process::CommandExt,
+    process::{Command, Stdio},
 };
 
 use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
@@ -14,7 +15,10 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(current_dir: String, game_id: String) -> Self {
-        Runner { current_dir, game_id }
+        Runner {
+            current_dir,
+            game_id,
+        }
     }
 }
 
@@ -53,10 +57,7 @@ impl Run for Runner {
 impl Drop for Runner {
     fn drop(&mut self) {
         Command::new("docker")
-            .args([
-                "stop",
-                &format!("{}_python_runner", self.game_id)
-            ])
+            .args(["stop", &format!("{}_python_runner", self.game_id)])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()

@@ -99,7 +99,7 @@ impl ProcessOutput {
                     .map_err(map_err)?;
                 if self.output.len() < limit {
                     let rem = limit - self.output.len();
-                    buf = buf.chars().take(rem).into_iter().collect::<String>();
+                    buf = buf.chars().take(rem).collect::<String>();
                 } else {
                     buf = String::new();
                 }
@@ -138,10 +138,11 @@ impl Pollable for EpollEntryType {
         let flags = event.events();
         match self {
             EpollEntryType::Process(_) => Ok(CallbackMessage::HandleExplicitly(self.get_fd())),
-            EpollEntryType::StdErr(o) => {
+            EpollEntryType::StdErr(output) => {
                 let mut message = CallbackMessage::Nop;
                 if flags.contains(EpollFlags::EPOLLIN) {
-                    o.read_to_string()
+                    output
+                        .read_to_string()
                         .map_err(|e| EpollError::EpollCallbackError(format!("{e:?}")))?;
                 }
                 if flags.contains(EpollFlags::EPOLLHUP) {
@@ -150,6 +151,5 @@ impl Pollable for EpollEntryType {
                 Ok(message)
             }
         }
-        // unimplemented!()
     }
 }

@@ -21,7 +21,7 @@ impl Drop for GameDir {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, io::Write};
+    use std::{io::Write, path::Path};
 
     use super::GameDir;
 

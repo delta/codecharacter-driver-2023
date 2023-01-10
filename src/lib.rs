@@ -1,17 +1,17 @@
 #![feature(linux_pidfd)]
 use std::collections::HashMap;
 
-use error::{SimulatorError};
+use error::SimulatorError;
 use log::error;
 use response::{GameResult, GameStatusEnum};
-pub mod poll;
-pub mod runner;
 pub mod error;
 pub mod fifo;
 pub mod game_dir;
 pub mod mq;
+pub mod poll;
 pub mod request;
 pub mod response;
+pub mod runner;
 pub mod utils;
 
 // maximum size for log will be around 200KBs, everything after that is ignored
@@ -77,7 +77,8 @@ pub fn create_final_response(
         if ln.starts_with("TURN") {
             if let Some(num) = ln
                 .strip_prefix("TURN, ")
-                .and_then(|x| x.parse::<usize>().ok()) {
+                .and_then(|x| x.parse::<usize>().ok())
+            {
                 if turnwise_logs.contains_key(&num) {
                     for log in turnwise_logs.get(&num).unwrap().iter() {
                         final_logs.push_str(&format!("PRINT, {log}\n"));
@@ -158,9 +159,7 @@ pub fn create_error_response(
             destruction_percentage: 0.0,
             coins_used: 0,
             has_errors: true,
-            log: format!(
-                "ERRORS, ERROR TYPE: {err_type}\nERRORS, ERROR LOG:\n{error}\n"
-            ),
+            log: format!("ERRORS, ERROR TYPE: {err_type}\nERRORS, ERROR LOG:\n{error}\n"),
         }),
     }
 }

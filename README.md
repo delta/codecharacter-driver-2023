@@ -7,6 +7,12 @@
    rustup install nightly && rustup default nightly
    ```
 
+3. Install pre-commit hooks
+   ```
+   pip install pre-commit
+   pre-commit install
+   ```
+
 ## Setup
 
 1. Clone the repository

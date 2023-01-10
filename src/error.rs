@@ -22,13 +22,5 @@ pub enum EpollError {
 impl From<EpollError> for SimulatorError {
     fn from(val: EpollError) -> Self {
         SimulatorError::EpollError(format!("{val:?}"))
-        // match val {
-        // EpollError::EpollCreateError(e) => SimulatorError::EpollError(e),
-        // EpollError::PidFdError(e) => SimulatorError::EpollError(e),
-        // EpollError::EpollRegisterError(e) => SimulatorError::EpollError(e),
-        // EpollError::EpollWaitError(e) => SimulatorError::EpollError(e),
-        // EpollError::EpollProcessNotFound(e) => SimulatorError::EpollError(e),
-        // }
     }
 }
-
