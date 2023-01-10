@@ -1,14 +1,19 @@
 use std::sync::Arc;
 
 use cc_driver::{
-    runner::{cpp, java, py, simulator, Executable, Run},
     create_error_response, create_executing_response,
     error::SimulatorError,
     fifo::Fifo,
     game_dir::GameDir,
     mq::{consumer, Publisher},
+    poll::{
+        epoll::{CallbackMessage, Epoll, EpollGeneric},
+        epoll_entry::{EpollEntryType, Process, ProcessOutput, ProcessType},
+    },
     request::{GameRequest, Language},
-    response::GameStatus, EPOLL_WAIT_TIMEOUT, poll::{epoll::Epoll, process::{ProcessOutput, Files, Process, ProcessType}},
+    response::GameStatus,
+    runner::{cpp, java, py, simulator, Executable, Run},
+    EPOLL_WAIT_TIMEOUT,
 };
 use log::{info, LevelFilter};
 use log4rs::{
@@ -24,23 +29,25 @@ use nix::sys::epoll::EpollFlags;
 fn handle_event(event_handler: &mut Epoll) -> Result<Option<ProcessOutput>, SimulatorError> {
     let (event, file) = match event_handler
         .poll(EPOLL_WAIT_TIMEOUT)
-        .map_err(SimulatorError::from)? {
+        .map_err(SimulatorError::from)?
+    {
         Some(res) => res,
-        None => return Ok(None)
+        None => return Ok(None),
     };
 
     match file {
-        Files::Process(_) => {
+        EpollEntryType::Process(_) => {
             let fd = event.data();
-            
+
             let mut proc = event_handler
                 .unregister(fd)
                 .map_err(SimulatorError::from)?
-                .0.unwrap();
+                .0
+                .unwrap();
 
             let exit_status = match proc.wait() {
                 Ok(status) => status,
-                Err(err) => return Err(err)
+                Err(err) => return Err(err),
             };
 
             if exit_status.success() {
@@ -54,27 +61,95 @@ fn handle_event(event_handler: &mut Epoll) -> Result<Option<ProcessOutput>, Simu
 
             Err(match exit_status.code() {
                 // 137 => Stands for container killing itself (by SIGKILL) that will be due to contraint provided
-                None | Some(137) => SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_owned()),
-                Some(code) => SimulatorError::RuntimeError(format!("Program exited with non zero exit code: {code}")),
+                None | Some(137) => SimulatorError::TimeOutError(
+                    "Process took longer than the specified time to execute, so it was killed"
+                        .to_owned(),
+                ),
+                Some(code) => SimulatorError::RuntimeError(format!(
+                    "Program exited with non zero exit code: {code}"
+                )),
             })
-        },
-        Files::StdErr(output) => {
-            match event.events() {
-                EpollFlags::EPOLLHUP => {
-                    let output= event_handler
-                        .unregister(event.data())
-                        .map_err(SimulatorError::from)?
-                        .1.unwrap();
+        }
+        EpollEntryType::StdErr(output) => match event.events() {
+            EpollFlags::EPOLLHUP => {
+                let output = event_handler
+                    .unregister(event.data())
+                    .map_err(SimulatorError::from)?
+                    .1
+                    .unwrap();
 
-                    Ok(Some(output))
+                Ok(Some(output))
+            }
+            _ => {
+                output.read_to_string()?;
+                Ok(None)
+            }
+        },
+    }
+}
+
+fn handle_event_2(
+    epoll_handle: &mut EpollGeneric<EpollEntryType>,
+) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
+    let events = epoll_handle.poll(EPOLL_WAIT_TIMEOUT, epoll_handle.get_registered_fds().len())?;
+    let mut res = vec![];
+    for e in events {
+        match epoll_handle.process_event(e)? {
+            CallbackMessage::Unregister(fd) => {
+                // Means it's a stderr handle
+                let entry = epoll_handle.unregister(fd as u64)?;
+                res.push(match entry {
+                    EpollEntryType::Process(_) => unreachable!(),
+                    EpollEntryType::StdErr(o) => Some(o),
+                });
+            }
+            CallbackMessage::HandleExplicitly(fd) => {
+                // Means its a process handle
+                let entry = epoll_handle.unregister(fd as u64)?;
+                match entry {
+                    EpollEntryType::StdErr(_) => unreachable!(),
+                    EpollEntryType::Process(mut p) => {
+                        let exit_status = p.wait()?;
+
+                        if exit_status.success() {
+                            res.push(None);
+                        } else {
+                            let killable_processes = epoll_handle
+                                .get_registered_fds()
+                                .iter()
+                                .filter_map(|x| match x.1 {
+                                    EpollEntryType::Process(_) => Some(*x.0),
+                                    _ => None,
+                                })
+                                .collect::<Vec<u64>>();
+                            killable_processes.iter().for_each(|x| {
+                                match epoll_handle.unregister(*x).unwrap() {
+                                    EpollEntryType::Process(mut p) => p.kill(),
+                                    EpollEntryType::StdErr(_) => unreachable!(),
+                                }
+                            });
+
+                            return Err(match exit_status.code() {
+                            // 137 => Stands for container killing itself (by SIGKILL) 
+                            // that will be due to contraint provided
+                            None | Some(137) => SimulatorError::TimeOutError(
+                                "Process took longer than the specified time to execute, so it was killed"
+                                    .to_owned(),
+                            ),
+                            Some(code) => SimulatorError::RuntimeError(format!(
+                                "Program exited with non zero exit code: {code}"
+                            )),
+                            });
+                        }
+                    }
                 }
-                _ => {
-                    output.read_to_string()?;
-                    Ok(None)
-                }
+            }
+            CallbackMessage::Nop => {
+                res.push(None);
             }
         }
     }
+    Ok(res)
 }
 
 fn handler(game_request: GameRequest) -> GameStatus {
@@ -133,21 +208,21 @@ fn handler(game_request: GameRequest) -> GameStatus {
             cc_driver::utils::send_initial_input(vec![&p1_stdout, &p2_stdout], &game_request);
 
             let runner: Box<dyn Executable> = match game_request.language {
-                Language::CPP => Box::new(
-                    cpp::Runner::new(
-                        game_dir_handle.get_path().to_string(),
-                        game_request.game_id.to_string())),
-                Language::PYTHON => Box::new(
-                    py::Runner::new(
-                        game_dir_handle.get_path().to_string(),
-                        game_request.game_id.to_string())),
-                Language::JAVA => Box::new(
-                    java::Runner::new(
-                        game_dir_handle.get_path().to_string(),
-                        game_request.game_id.to_string())),
+                Language::CPP => Box::new(cpp::Runner::new(
+                    game_dir_handle.get_path().to_string(),
+                    game_request.game_id.to_string(),
+                )),
+                Language::PYTHON => Box::new(py::Runner::new(
+                    game_dir_handle.get_path().to_string(),
+                    game_request.game_id.to_string(),
+                )),
+                Language::JAVA => Box::new(java::Runner::new(
+                    game_dir_handle.get_path().to_string(),
+                    game_request.game_id.to_string(),
+                )),
             };
 
-            let intialize = || -> Result<Epoll, SimulatorError> {
+            let intialize = || -> Result<_, SimulatorError> {
                 let mut player_process = runner.run(p1_stdin, p1_stdout)?;
                 let simulator = simulator::Simulator::new(game_request.game_id.to_string());
                 let mut sim_process = simulator.run(p2_stdin, p2_stdout)?;
@@ -160,18 +235,26 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 let player_output = ProcessOutput::new(player_stderr, ProcessType::Runner);
                 let sim_output = ProcessOutput::new(sim_stderr, ProcessType::Simulator);
 
-                let player = Files::Process(player_process);
-                let player_output = Files::StdErr(player_output);
-                let sim = Files::Process(sim_process);
-                let sim_output = Files::StdErr(sim_output);
+                let player = EpollEntryType::Process(player_process);
+                let player_output = EpollEntryType::StdErr(player_output);
+                let sim = EpollEntryType::Process(sim_process);
+                let sim_output = EpollEntryType::StdErr(sim_output);
 
-                let mut event_handler: Epoll = Epoll::new()
+                let mut event_handler =
+                    EpollGeneric::<EpollEntryType>::new().map_err(SimulatorError::from)?;
+
+                event_handler
+                    .register(player, EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP)
                     .map_err(SimulatorError::from)?;
-
-                event_handler.register(player).map_err(SimulatorError::from)?;
-                event_handler.register(player_output).map_err(SimulatorError::from)?;
-                event_handler.register(sim).map_err(SimulatorError::from)?;
-                event_handler.register(sim_output).map_err(SimulatorError::from)?;
+                event_handler
+                    .register(player_output, EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP)
+                    .map_err(SimulatorError::from)?;
+                event_handler
+                    .register(sim, EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP)
+                    .map_err(SimulatorError::from)?;
+                event_handler
+                    .register(sim_output, EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP)
+                    .map_err(SimulatorError::from)?;
 
                 Ok(event_handler)
             };
@@ -181,15 +264,19 @@ fn handler(game_request: GameRequest) -> GameStatus {
                 Err(err) => return create_error_response(&game_request, err),
             };
 
-            let mut outputs = vec![];
+            let mut outputs: Vec<ProcessOutput> = vec![];
 
             while !event_handler.is_empty() {
-                let result = handle_event(&mut event_handler);
-
+                let result = handle_event_2(&mut event_handler);
                 match result {
-                    Ok(Some(process_output)) => outputs.push(process_output),
+                    Ok(processing_outputs) => {
+                        for output in processing_outputs {
+                            if let Some(o) = output {
+                                outputs.push(o);
+                            }
+                        }
+                    }
                     Err(err) => return create_error_response(&game_request, err),
-                    _ => {}
                 }
             }
 
@@ -205,9 +292,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
             cc_driver::create_final_response(game_request, player_process_out, sim_process_out)
         }
 
-        (Err(e), _) | (_, Err(e)) => {
-            create_error_response(&game_request, e)
-        }
+        (Err(e), _) | (_, Err(e)) => create_error_response(&game_request, e),
     }
 }
 
