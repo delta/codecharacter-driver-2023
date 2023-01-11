@@ -9,7 +9,7 @@ use crate::{
     RUNTIME_TIME_LIMIT,
 };
 
-use super::Run;
+use super::Runnable;
 
 pub struct Runner {
     current_dir: String,
@@ -25,7 +25,7 @@ impl Runner {
     }
 }
 
-impl Run for Runner {
+impl Runnable for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([

@@ -12,7 +12,7 @@ use cc_driver::{
     },
     request::{GameRequest, Language},
     response::GameStatus,
-    runner::{cpp, java, py, simulator, Run},
+    runner::{cpp, java, py, simulator, Runnable},
     EPOLL_WAIT_TIMEOUT,
 };
 use log::{info, LevelFilter};
@@ -145,7 +145,7 @@ fn handler(game_request: GameRequest) -> GameStatus {
 
             cc_driver::utils::send_initial_input(vec![&p1_stdout, &p2_stdout], &game_request);
 
-            let runner: Box<dyn Run> = match game_request.language {
+            let runner: Box<dyn Runnable> = match game_request.language {
                 Language::CPP => Box::new(cpp::Runner::new(
                     game_dir_handle.get_path().to_string(),
                     game_request.game_id.to_string(),

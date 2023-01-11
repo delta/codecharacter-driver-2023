@@ -6,7 +6,7 @@ use std::{
 
 use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
-use super::Run;
+use super::Runnable;
 
 pub struct Runner {
     current_dir: String,
@@ -22,7 +22,7 @@ impl Runner {
     }
 }
 
-impl Run for Runner {
+impl Runnable for Runner {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
         Command::new("docker")
             .args([
