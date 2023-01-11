@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 use crate::error::SimulatorError;
 use crate::{RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
-use super::{Executable, Run};
+use super::Run;
 
 pub struct Simulator {
     game_id: String,
@@ -46,16 +46,3 @@ impl Run for Simulator {
             })
     }
 }
-
-impl Drop for Simulator {
-    fn drop(&mut self) {
-        Command::new("docker")
-            .args(["stop", &format!("{}_simulator", self.game_id)])
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .ok();
-    }
-}
-
-impl Executable for Simulator {}

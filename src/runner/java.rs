@@ -9,7 +9,7 @@ use crate::{
     RUNTIME_TIME_LIMIT,
 };
 
-use super::{Executable, Run};
+use super::Run;
 
 pub struct Runner {
     current_dir: String,
@@ -98,20 +98,3 @@ impl Run for Runner {
             })
     }
 }
-
-impl Drop for Runner {
-    fn drop(&mut self) {
-        Command::new("docker")
-            .args([
-                "stop",
-                &format!("{}_java_compiler", self.game_id),
-                &format!("{}_java_runner", self.game_id),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .ok();
-    }
-}
-
-impl Executable for Runner {}
