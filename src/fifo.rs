@@ -19,14 +19,14 @@ impl Fifo {
             stat::Mode::S_IRWXU | stat::Mode::S_IRWXG | stat::Mode::S_IRWXO,
         ) {
             Ok(_) | Err(nix::errno::Errno::EEXIST) => Ok(()),
-            Err(e) => Err(SimulatorError::FifoCreationError(format!("{}", e))),
+            Err(e) => Err(SimulatorError::FifoCreationError(format!("{e}"))),
         }
     }
     fn make_blocking(fd: i32) -> Result<(), SimulatorError> {
         let mut flags = OFlag::from_bits_truncate(fcntl::fcntl(fd, FcntlArg::F_GETFL).unwrap());
         flags.remove(OFlag::O_NONBLOCK);
         fcntl::fcntl(fd, FcntlArg::F_SETFL(flags))
-            .map_err(|e| SimulatorError::FifoCreationError(format!("{}", e)))?;
+            .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
         Ok(())
     }
     fn setup_pipe(f: &str) -> Result<(File, File), SimulatorError> {
@@ -35,11 +35,11 @@ impl Fifo {
             .custom_flags(O_NONBLOCK)
             .read(true)
             .open(f)
-            .map_err(|e| SimulatorError::FifoCreationError(format!("{}", e)))?;
+            .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
         let stdout = OpenOptions::new()
             .write(true)
             .open(f)
-            .map_err(|e| SimulatorError::FifoCreationError(format!("{}", e)))?;
+            .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
         let stdin_fd = stdin.as_raw_fd();
         Fifo::make_blocking(stdin_fd)?;
         Ok((stdin, stdout))
@@ -91,7 +91,7 @@ mod fifo_tests {
         assert_eq!(s1, s2);
         assert_eq!(string, "Hello World".to_owned());
 
-        println!("{}", string);
+        println!("{string}");
     }
     #[test]
     fn added_data_to_fifo_before_running_cmd_is_saved() {

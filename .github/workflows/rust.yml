@@ -17,6 +17,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
+      - name: Switch to Rust Nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
       - name: Build
         run: cargo build --verbose
       - name: Run tests

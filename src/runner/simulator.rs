@@ -1,14 +1,15 @@
 use std::fs::File;
 
+use std::os::linux::process::CommandExt;
 use std::process::{Command, Stdio};
 
-use crate::{RUNTIME_TIME_LIMIT, RUNTIME_MEMORY_LIMIT};
 use crate::error::SimulatorError;
+use crate::{RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
 
-use super::{Executable, Run};
+use super::Runnable;
 
 pub struct Simulator {
-    game_id: String
+    game_id: String,
 }
 
 impl Simulator {
@@ -17,48 +18,31 @@ impl Simulator {
     }
 }
 
-impl Run for Simulator {
+impl Runnable for Simulator {
     fn run(&self, stdin: File, stdout: File) -> Result<std::process::Child, SimulatorError> {
-        Command::new("timeout")
+        Command::new("docker")
             .args([
-                "--signal=KILL",
-                RUNTIME_TIME_LIMIT,
-                "docker",
                 "run",
-                &format!("--memory={}", RUNTIME_MEMORY_LIMIT),
-                &format!("--memory-swap={}", RUNTIME_MEMORY_LIMIT),
+                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
                 "--cpus=1",
+                "--ulimit",
+                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
                 "--rm",
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "-i",
                 "ghcr.io/delta/codecharacter-simulator:latest",
             ])
+            .create_pidfd(true)
             .stdin(stdin)
             .stdout(stdout)
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|err| {
                 SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the simulator process: {}",
-                    err
+                    "Couldnt spawn the simulator process: {err}"
                 ))
             })
     }
 }
-
-impl Drop for Simulator {
-    fn drop(&mut self) {
-        Command::new("docker")
-            .args([
-                "stop",
-                &format!("{}_simulator", self.game_id),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .ok();
-    }
-}
-
-impl Executable for Simulator {}

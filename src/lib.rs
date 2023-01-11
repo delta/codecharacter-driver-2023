@@ -1,76 +1,26 @@
-use std::{collections::HashMap, io::Read, os::unix::prelude::ExitStatusExt, process::Child};
+#![feature(linux_pidfd)]
+use std::collections::HashMap;
 
 use error::SimulatorError;
 use log::error;
 use response::{GameResult, GameStatusEnum};
-pub mod runner;
 pub mod error;
 pub mod fifo;
 pub mod game_dir;
 pub mod mq;
+pub mod poll;
 pub mod request;
 pub mod response;
+pub mod runner;
 pub mod utils;
 
 // maximum size for log will be around 200KBs, everything after that is ignored
 const MAXLOGSIZE: usize = 200000;
-const SIGKILL: i32 = 9;
 const COMPILATION_TIME_LIMIT: &str = "5";
 const RUNTIME_TIME_LIMIT: &str = "10";
 const COMPILATION_MEMORY_LIMIT: &str = "300m";
 const RUNTIME_MEMORY_LIMIT: &str = "100m";
-
-pub fn handle_process(
-    proc: Child,
-    is_player_process: bool,
-    make_err: fn(String) -> SimulatorError,
-) -> Result<String, SimulatorError> {
-    match proc.wait_with_output() {
-        Ok(out) => {
-            let logs_extraction_result: Result<String, std::io::Error> = if is_player_process {
-                let mut logs = String::new();
-                out.stderr
-                    .take(MAXLOGSIZE as u64)
-                    .read_to_string(&mut logs)
-                    .map(|_| logs)
-            } else {
-                String::from_utf8(out.stderr)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))
-            };
-            if out.status.success() {
-                match logs_extraction_result {
-                    Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!("Error during log extraction: {}", e),
-                    )),
-                    Ok(logs) => Ok(logs),
-                }
-            } else {
-                if let Some(sig) = out.status.signal() {
-                    if sig == SIGKILL {
-                        return Err(SimulatorError::TimeOutError("Process took longer than the specified time to execute, so it was killed".to_string()));
-                    }
-                }
-
-                match logs_extraction_result {
-                    Err(e) => Err(SimulatorError::UnidentifiedError(
-                        format!(
-                            "Program exited with non zero exit code followed by error during log extraction: {}",
-                            e
-                        )
-                    )),
-                    Ok(logs) => Err(make_err(format!(
-                        "Program exited with non zero exit code: {} ",
-                        logs
-                    ))),
-                }
-            }
-        }
-        Err(err) => Err(SimulatorError::UnidentifiedError(format!(
-            "Waiting on Child Failed: {}",
-            err
-        ))),
-    }
-}
+pub const EPOLL_WAIT_TIMEOUT: isize = 30_000;
 
 fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
     let mut turnwise_logs = HashMap::new();
@@ -127,10 +77,11 @@ pub fn create_final_response(
         if ln.starts_with("TURN") {
             if let Some(num) = ln
                 .strip_prefix("TURN, ")
-                .and_then(|x| x.parse::<usize>().ok()) {
+                .and_then(|x| x.parse::<usize>().ok())
+            {
                 if turnwise_logs.contains_key(&num) {
                     for log in turnwise_logs.get(&num).unwrap().iter() {
-                        final_logs.push_str(&format!("PRINT, {}\n", log));
+                        final_logs.push_str(&format!("PRINT, {log}\n"));
                     }
                 }
             }
@@ -192,12 +143,12 @@ pub fn create_error_response(
             ("Unidentified Error. Contact the POCs!".to_owned(), e)
         }
         SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
+        SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
     };
 
     let error = error
         .lines()
-        .into_iter()
-        .map(|x| format!("ERRORS, {}", x))
+        .map(|x| format!("ERRORS, {x}"))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -208,10 +159,7 @@ pub fn create_error_response(
             destruction_percentage: 0.0,
             coins_used: 0,
             has_errors: true,
-            log: format!(
-                "ERRORS, ERROR TYPE: {}\nERRORS, ERROR LOG:\n{}\n",
-                err_type, error
-            ),
+            log: format!("ERRORS, ERROR TYPE: {err_type}\nERRORS, ERROR LOG:\n{error}\n"),
         }),
     }
 }

@@ -4,9 +4,9 @@ pub struct GameDir {
 
 impl GameDir {
     pub fn new(game_id: &str) -> Option<Self> {
-        std::fs::create_dir(format!("/tmp/{}", game_id)).ok()?;
+        std::fs::create_dir(format!("/tmp/{game_id}")).ok()?;
         Some(GameDir {
-            full_path: format!("/tmp/{}", game_id),
+            full_path: format!("/tmp/{game_id}"),
         })
     }
     pub fn get_path(&self) -> &str {
@@ -21,7 +21,7 @@ impl Drop for GameDir {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, io::Write};
+    use std::{io::Write, path::Path};
 
     use super::GameDir;
 
@@ -32,7 +32,7 @@ mod tests {
 
         let full_path = match_dir_handle.get_path().to_owned();
 
-        let player_code_file = format!("{}/something",full_path);
+        let player_code_file = format!("{full_path}/something");
         let _ = std::fs::File::create(player_code_file).and_then(|mut file| {
             file.write_all("Hello".as_bytes())
                 .and_then(|_| file.sync_all())
