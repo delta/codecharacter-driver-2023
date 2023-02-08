@@ -2,9 +2,10 @@ use std::{
     fs::File,
     os::linux::process::CommandExt,
     process::{Command, Stdio},
+    env
 };
 
-use crate::{error::SimulatorError, RUNTIME_MEMORY_LIMIT, RUNTIME_TIME_LIMIT};
+use crate::{error::SimulatorError};
 
 use super::Runnable;
 
@@ -27,11 +28,11 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
-                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory-swap={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
+                &format!("cpu={}:{}", env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
                 "--rm",
                 "--name",
                 &format!("{}_python_runner", self.game_id),

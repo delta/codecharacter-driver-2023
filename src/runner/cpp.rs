@@ -2,11 +2,11 @@ use std::{
     fs::File,
     os::linux::process::CommandExt,
     process::{Child, Command, Stdio},
+    env,
 };
 
 use crate::{
-    error::SimulatorError, COMPILATION_MEMORY_LIMIT, COMPILATION_TIME_LIMIT, RUNTIME_MEMORY_LIMIT,
-    RUNTIME_TIME_LIMIT,
+    error::SimulatorError
 };
 
 use super::Runnable;
@@ -30,11 +30,11 @@ impl Runnable for Runner {
         let compile = Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={COMPILATION_MEMORY_LIMIT}"),
-                &format!("--memory-swap={COMPILATION_MEMORY_LIMIT}"),
+                &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
+                &format!("--memory-swap={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
                 "--cpus=2",
                 "--ulimit",
-                &format!("cpu={COMPILATION_TIME_LIMIT}:{COMPILATION_TIME_LIMIT}"),
+                &format!("cpu={}:{}", env::var("COMPILATION_TIME_LIMIT").unwrap(), env::var("COMPILATION_TIME_LIMIT").unwrap()),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_compiler", self.game_id),
@@ -68,11 +68,11 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={RUNTIME_MEMORY_LIMIT}"),
-                &format!("--memory-swap={RUNTIME_MEMORY_LIMIT}"),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory-swap={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={RUNTIME_TIME_LIMIT}:{RUNTIME_TIME_LIMIT}"),
+                &format!("cpu={}:{}", env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_runner", self.game_id),

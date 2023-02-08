@@ -14,14 +14,6 @@ pub mod response;
 pub mod runner;
 pub mod utils;
 
-// maximum size for log will be around 200KBs, everything after that is ignored
-const MAXLOGSIZE: usize = 200000;
-const COMPILATION_TIME_LIMIT: &str = "5";
-const RUNTIME_TIME_LIMIT: &str = "10";
-const COMPILATION_MEMORY_LIMIT: &str = "300m";
-const RUNTIME_MEMORY_LIMIT: &str = "100m";
-pub const EPOLL_WAIT_TIMEOUT: isize = 30_000;
-
 fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
     let mut turnwise_logs = HashMap::new();
 

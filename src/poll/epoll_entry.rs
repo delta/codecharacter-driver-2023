@@ -1,12 +1,12 @@
 use nix::sys::epoll::EpollFlags;
 
 use crate::error::EpollError;
-use crate::MAXLOGSIZE;
 
 use std::io::Read;
 use std::os::fd::AsRawFd;
 use std::os::linux::process::ChildExt;
 use std::process::ChildStderr;
+use std::env;
 
 use crate::error::SimulatorError;
 
@@ -90,7 +90,10 @@ impl ProcessOutput {
 
         match self.process_type {
             ProcessType::Runner => {
-                let limit = MAXLOGSIZE;
+                let limit: usize = env::var("MAX_LOG_SIZE")
+                    .unwrap()
+                    .parse()
+                    .unwrap();
                 let stderr = &mut self.stderr;
 
                 let _ = stderr
