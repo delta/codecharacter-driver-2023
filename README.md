@@ -3,6 +3,7 @@
 1. Install [Rust](https://www.rust-lang.org/tools/install)
 
 2. Switch to Rust Nightly
+
    ```
    rustup install nightly && rustup default nightly
    ```
@@ -25,7 +26,11 @@
     git submodule update --init
    ```
 
-3. Run
+3. Create config files
+   ```
+   cp config.example.toml config.toml
+   ```
+4. Run
    ```
    cargo run
    ```
