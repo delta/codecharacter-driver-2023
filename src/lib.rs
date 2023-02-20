@@ -7,6 +7,7 @@ use response::{GameResult, GameStatusEnum};
 pub mod error;
 pub mod fifo;
 pub mod game_dir;
+pub mod handlers;
 pub mod mq;
 pub mod poll;
 pub mod request;
@@ -50,7 +51,8 @@ fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
 }
 
 pub fn create_final_response(
-    game_request: request::GameRequest,
+    parameters: request::GameParameters,
+    game_id: String,
     player_log: String,
     simulator_log: String,
 ) -> response::GameStatus {
@@ -58,7 +60,7 @@ pub fn create_final_response(
 
     let mut final_logs = String::new();
 
-    let mut coins_left = game_request.parameters.no_of_coins;
+    let mut coins_left = parameters.no_of_coins;
     let mut destruction_percentage = 0.0;
 
     for ln in simulator_log.lines() {
@@ -103,29 +105,26 @@ pub fn create_final_response(
     }
 
     response::GameStatus {
-        game_id: game_request.game_id,
+        game_id,
         game_status: GameStatusEnum::EXECUTED,
         game_result: Some(GameResult {
             destruction_percentage,
-            coins_used: (game_request.parameters.no_of_coins - coins_left) as u64,
+            coins_used: (parameters.no_of_coins - coins_left) as u64,
             has_errors: false,
             log: final_logs,
         }),
     }
 }
 
-pub fn create_executing_response(game_request: &request::GameRequest) -> response::GameStatus {
+pub fn create_executing_response(game_id: &String) -> response::GameStatus {
     response::GameStatus {
-        game_id: game_request.game_id.to_string(),
+        game_id: game_id.to_owned(),
         game_status: GameStatusEnum::EXECUTING,
         game_result: None,
     }
 }
 
-pub fn create_error_response(
-    game_request: &request::GameRequest,
-    err: SimulatorError,
-) -> response::GameStatus {
+pub fn create_error_response(game_id: String, err: SimulatorError) -> response::GameStatus {
     error!("Error in execution: {:?}", err);
     let (err_type, error) = match err {
         SimulatorError::RuntimeError(e) => ("Runtime Error!".to_owned(), e),
@@ -136,6 +135,7 @@ pub fn create_error_response(
         }
         SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
         SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
+        SimulatorError::RabbitMqError(e) => ("RabbitMq Error!".to_owned(), e),
     };
 
     let error = error
@@ -145,7 +145,7 @@ pub fn create_error_response(
         .join("\n");
 
     response::GameStatus {
-        game_id: game_request.game_id.clone(),
+        game_id,
         game_status: response::GameStatusEnum::EXECUTE_ERROR,
         game_result: Some(response::GameResult {
             destruction_percentage: 0.0,
@@ -161,7 +161,7 @@ mod tests {
 
     use crate::{
         create_final_response, get_turnwise_logs,
-        request::{GameParameters, GameRequest, Language},
+        request::{GameParameters, Language, NormalGameRequest, PlayerCode},
         response::{GameResult, GameStatus, GameStatusEnum},
     };
 
@@ -220,7 +220,7 @@ mod tests {
             TURN, 100
             DESTRUCTION, 75.0%
             COINS, 10"#;
-        let dummy_game_request = GameRequest {
+        let dummy_game_request = NormalGameRequest {
             game_id: "1".to_owned(),
             parameters: GameParameters {
                 attackers: vec![],
@@ -228,14 +228,17 @@ mod tests {
                 no_of_turns: 500,
                 no_of_coins: 500,
             },
-            language: Language::CPP,
-            source_code: "".to_owned(),
+            player_code: PlayerCode {
+                language: Language::CPP,
+                source_code: "".to_owned(),
+            },
             map: vec![vec![]],
         };
 
         let tot_coins = dummy_game_request.parameters.no_of_coins;
         let result = create_final_response(
-            dummy_game_request,
+            dummy_game_request.parameters,
+            dummy_game_request.game_id,
             player_logs.to_owned(),
             simulator_logs.to_owned(),
         );

@@ -7,24 +7,26 @@ use std::{
 
 use crate::error::SimulatorError;
 
-use super::Runnable;
+use super::{GameType, Runnable};
 
 pub struct Runner {
     current_dir: String,
     game_id: String,
+    file_name: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
         Runner {
             current_dir,
             game_id,
+            file_name,
         }
     }
 }
 
 impl Runnable for Runner {
-    fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
+    fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([
                 "run",
@@ -46,6 +48,7 @@ impl Runnable for Runner {
                 "-v",
                 format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
                 &env::var("JAVA_COMPILER_IMAGE").unwrap(),
+                &game_type.to_string(),
             ])
             .current_dir(&self.current_dir)
             .stdout(Stdio::null())
@@ -90,6 +93,7 @@ impl Runnable for Runner {
                 "-v",
                 format!("{}/run.jar:/run.jar", self.current_dir.as_str()).as_str(),
                 &env::var("JAVA_RUNNER_IMAGE").unwrap(),
+                &game_type.to_string(),
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)

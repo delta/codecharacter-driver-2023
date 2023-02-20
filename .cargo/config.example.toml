@@ -15,6 +15,7 @@ EPOLL_WAIT_TIMEOUT="30000"
 
 RABBITMQ_HOST="amqp://guest:guest@localhost"
 REQUEST_QUEUE="gameRequestQueue"
+PVP_REQUEST_QUEUE="gamePvpRequestQueue"
 RESPONSE_QUEUE="gameStatusUpdateQueue"
 
 MAP_SIZE="64"
