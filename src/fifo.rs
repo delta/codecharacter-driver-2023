@@ -2,7 +2,7 @@ use std::fs::{remove_file, File, OpenOptions};
 use std::os::unix::prelude::{AsRawFd, OpenOptionsExt};
 
 use crate::error::SimulatorError;
-use nix::fcntl::{self, FcntlArg, OFlag};
+use nix::fcntl::{self, FcntlArg, FdFlag, OFlag};
 use nix::libc::O_NONBLOCK;
 use nix::sys::stat;
 use nix::unistd::mkfifo;
@@ -22,6 +22,7 @@ impl Fifo {
             Err(e) => Err(SimulatorError::FifoCreationError(format!("{e}"))),
         }
     }
+
     fn make_blocking(fd: i32) -> Result<(), SimulatorError> {
         let mut flags = OFlag::from_bits_truncate(fcntl::fcntl(fd, FcntlArg::F_GETFL).unwrap());
         flags.remove(OFlag::O_NONBLOCK);
@@ -29,6 +30,17 @@ impl Fifo {
             .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
         Ok(())
     }
+
+    fn remove_close(fd: i32) -> Result<(), SimulatorError> {
+        let mut flags = FdFlag::from_bits_truncate(fcntl::fcntl(fd, FcntlArg::F_GETFD).unwrap());
+
+        flags.remove(FdFlag::FD_CLOEXEC);
+        fcntl::fcntl(fd, FcntlArg::F_SETFD(flags))
+            .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
+
+        Ok(())
+    }
+
     fn setup_pipe(f: &str) -> Result<(File, File), SimulatorError> {
         Fifo::open_fifo(f)?;
         let stdin = OpenOptions::new()
@@ -41,9 +53,13 @@ impl Fifo {
             .open(f)
             .map_err(|e| SimulatorError::FifoCreationError(format!("{e}")))?;
         let stdin_fd = stdin.as_raw_fd();
+        let stdout_fd = stdout.as_raw_fd();
         Fifo::make_blocking(stdin_fd)?;
+        Fifo::remove_close(stdin_fd)?;
+        Fifo::remove_close(stdout_fd)?;
         Ok((stdin, stdout))
     }
+
     pub fn new(filename: String) -> Result<Self, SimulatorError> {
         let (fin, fout) = Fifo::setup_pipe(&filename)?;
         Ok(Self {
@@ -52,6 +68,7 @@ impl Fifo {
             _out: Some(fout),
         })
     }
+
     pub fn get_ends(&mut self) -> Option<(File, File)> {
         match (self._in.take(), self._out.take()) {
             (Some(_in), Some(_out)) => Some((_in, _out)),
@@ -91,7 +108,7 @@ mod fifo_tests {
         assert_eq!(s1, s2);
         assert_eq!(string, "Hello World".to_owned());
 
-        println!("{string}");
+        log::info!("{string}");
     }
     #[test]
     fn added_data_to_fifo_before_running_cmd_is_saved() {

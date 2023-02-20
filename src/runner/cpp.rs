@@ -1,47 +1,64 @@
 use std::{
+    env,
     fs::File,
     os::linux::process::CommandExt,
     process::{Child, Command, Stdio},
-    env,
 };
 
-use crate::{
-    error::SimulatorError
-};
+use crate::error::SimulatorError;
 
-use super::Runnable;
+use super::{GameType, Runnable};
 
 pub struct Runner {
     current_dir: String,
     game_id: String,
+    file_name: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
         Runner {
             current_dir,
             game_id,
+            file_name,
         }
     }
 }
 
 impl Runnable for Runner {
-    fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
+    fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([
                 "run",
                 &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("COMPILATION_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=2",
                 "--ulimit",
-                &format!("cpu={}:{}", env::var("COMPILATION_TIME_LIMIT").unwrap(), env::var("COMPILATION_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("COMPILATION_TIME_LIMIT").unwrap(),
+                    env::var("COMPILATION_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_compiler", self.game_id),
                 "-v",
-                format!("{}/run.cpp:/player_code/run.cpp", self.current_dir.as_str()).as_str(),
+                format!(
+                    "{}/{}.cpp:/player_code/run.cpp",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
                 "-v",
-                format!("{}/run:/player_code/run", self.current_dir.as_str()).as_str(),
+                format!(
+                    "{}/{}:/player_code/run",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
                 "ghcr.io/delta/codecharacter-cpp-compiler:latest",
             ])
             .current_dir(&self.current_dir)
@@ -69,17 +86,31 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}", env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_cpp_runner", self.game_id),
                 "-i",
                 "-v",
-                format!("{}/run:/player_code", self.current_dir.as_str()).as_str(),
+                format!(
+                    "{}/{}:/player_code",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
                 "ghcr.io/delta/codecharacter-cpp-runner:latest",
+                // pass the type of game we want to execute
+                &game_type.to_string(),
             ])
             .current_dir(&self.current_dir)
             .create_pidfd(true)
