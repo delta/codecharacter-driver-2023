@@ -28,7 +28,7 @@
 
 3. Create config files
    ```
-   cp config.example.toml config.toml
+   cp .cargo/config.example.toml .cargo/config.toml
    ```
 4. Run
    ```

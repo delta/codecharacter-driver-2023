@@ -32,7 +32,7 @@ impl Runnable for Simulator {
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "-i",
-                "ghcr.io/delta/codecharacter-simulator:latest",
+                &env::var("SIMULATOR_IMAGE").unwrap(),
             ])
             .create_pidfd(true)
             .stdin(stdin)

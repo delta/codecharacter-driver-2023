@@ -39,7 +39,7 @@ impl Runnable for Runner {
                 "-i",
                 "-v",
                 format!("{}/run.py:/player_code/run.py", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-python-runner:latest",
+                &env::var("PYTHON_RUNNER_IMAGE").unwrap(),
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)

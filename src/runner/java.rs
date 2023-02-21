@@ -46,7 +46,7 @@ impl Runnable for Runner {
                 .as_str(),
                 "-v",
                 format!("{}/run.jar:/player_code/run.jar", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-java-compiler:latest",
+                &env::var("JAVA_COMPILER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
             .stdout(Stdio::null())
@@ -83,7 +83,7 @@ impl Runnable for Runner {
                 "-i",
                 "-v",
                 format!("{}/run.jar:/run.jar", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-java-runner:latest",
+                &env::var("JAVA_RUNNER_IMAGE").unwrap(),
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)

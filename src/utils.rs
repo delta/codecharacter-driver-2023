@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufWriter, Write},
+    io::{BufWriter, Write}, env,
 };
 
 use fs_extra::dir::CopyOptions;
@@ -46,12 +46,13 @@ pub fn send_initial_input(fifos: Vec<&File>, game_request: &GameRequest) {
             writer
                 .write_all(
                     format!(
-                        "{} {} {} {} {}\n",
+                        "{} {} {} {} {} {}\n",
                         attacker.hp,
                         attacker.range,
                         attacker.attack_power,
                         attacker.speed,
-                        attacker.price
+                        attacker.price,
+                        attacker.is_aerial
                     )
                     .as_bytes(),
                 )
@@ -64,14 +65,15 @@ pub fn send_initial_input(fifos: Vec<&File>, game_request: &GameRequest) {
             writer
                 .write_all(
                     format!(
-                        "{} {} {} {} {}\n",
-                        defender.hp, defender.range, defender.attack_power, 0, defender.price
+                        "{} {} {} {} {} {}\n",
+                        defender.hp, defender.range, defender.attack_power, 0, defender.price, defender.is_aerial
                     )
                     .as_bytes(),
                 )
                 .unwrap();
         }
-        writer.write_all("64 64\n".as_bytes()).unwrap();
+        let map_size: u32 = env::var("MAP_SIZE").unwrap().parse().unwrap();
+        writer.write_all(format!("{map_size} {map_size}\n").as_bytes()).unwrap();
         for row in game_request.map.iter() {
             for cell in row.iter() {
                 writer.write_all(format!("{cell} ").as_bytes()).unwrap();

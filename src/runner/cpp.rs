@@ -42,7 +42,7 @@ impl Runnable for Runner {
                 format!("{}/run.cpp:/player_code/run.cpp", self.current_dir.as_str()).as_str(),
                 "-v",
                 format!("{}/run:/player_code/run", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-cpp-compiler:latest",
+                &env::var("CPP_COMPILER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
             .stdout(Stdio::null())
@@ -79,7 +79,7 @@ impl Runnable for Runner {
                 "-i",
                 "-v",
                 format!("{}/run:/player_code", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-cpp-runner:latest",
+                &env::var("CPP_RUNNER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
             .create_pidfd(true)
