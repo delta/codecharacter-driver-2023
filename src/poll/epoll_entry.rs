@@ -90,7 +90,7 @@ impl ProcessOutput {
 
         match self.process_type {
             ProcessType::Runner => {
-                let limit: usize = env::var("MAX_LOG_SIZE").unwrap().parse().unwrap();
+                let limit: usize = 20_000;
                 let stderr = &mut self.stderr;
 
                 let _ = stderr
@@ -110,6 +110,7 @@ impl ProcessOutput {
         }
 
         self.output.push_str(buf.as_str());
+        println!("{}", self.output);
         Ok(())
     }
 }

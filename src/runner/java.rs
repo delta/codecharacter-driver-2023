@@ -30,17 +30,17 @@ impl Runnable for Runner {
         let compile = Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
+                &format!("--memory={}", "300m"),
                 &format!(
                     "--memory-swap={}",
-                    env::var("COMPILATION_MEMORY_LIMIT").unwrap()
+                    "300m"
                 ),
                 "--cpus=1.5",
                 "--ulimit",
                 &format!(
                     "cpu={}:{}",
-                    env::var("COMPILATION_TIME_LIMIT").unwrap(),
-                    env::var("COMPILATION_TIME_LIMIT").unwrap()
+                   "5",
+                   "5"
                 ),
                 "--rm",
                 "--name",
@@ -86,17 +86,17 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory={}", "100m"),
                 &format!(
                     "--memory-swap={}",
-                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                    "100m"
                 ),
                 "--cpus=1",
                 "--ulimit",
                 &format!(
                     "cpu={}:{}",
-                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
-                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                    "10",
+                    "10"
                 ),
                 "--rm",
                 "--name",

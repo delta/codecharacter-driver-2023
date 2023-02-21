@@ -25,26 +25,26 @@ impl Simulator {
         p2_r: RawFd,
         p2_w: RawFd,
     ) -> Result<std::process::Child, SimulatorError> {
-        Command::new("docker")
+        Command::new("/home/ram/Desktop/codecharacter-2023/codecharacter-simulator-2023/build/bin/main")
             .args([
-                "run",
-                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!(
-                    "--memory-swap={}",
-                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
-                ),
-                "--cpus=1",
-                "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
-                    env::var("RUNTIME_TIME_LIMIT").unwrap()
-                ),
-                "--rm",
-                "--name",
-                &format!("{}_simulator", self.game_id),
-                "-i",
-                "ghcr.io/delta/codecharacter-simulator:latest",
+                // "run",
+                // &format!("--memory={}", "100m"),
+                // &format!(
+                //     "--memory-swap={}",
+                //     "100m"
+                // ),
+                // "--cpus=1",
+                // "--ulimit",
+                // &format!(
+                //     "cpu={}:{}",
+                //     "100",
+                //     "100"
+                // ),
+                // "--rm",
+                // "--name",
+                // &format!("{}_simulator", self.game_id),
+                // "-i",
+                // "pvp_sim",
                 "--type=PvP",
                 &format!("p1_in={p1_r}"),
                 &format!("p1_out={p1_w}"),
@@ -67,17 +67,17 @@ impl Simulator {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory={}", "100m"),
                 &format!(
                     "--memory-swap={}",
-                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                    "100m"
                 ),
                 "--cpus=1",
                 "--ulimit",
                 &format!(
                     "cpu={}:{}",
-                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
-                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                    "10",
+                    "10"
                 ),
                 "--rm",
                 "--name",
