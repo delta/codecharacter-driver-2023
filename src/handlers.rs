@@ -26,7 +26,7 @@ fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
 ) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
     let events = epoll_handle.poll(
-        env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(),
+        30_000,
         epoll_handle.get_registered_fds().len(),
     )?;
     let mut res = vec![];
@@ -47,6 +47,7 @@ fn handle_event(
                     EpollEntryType::StdErr(_) => unreachable!(),
                     EpollEntryType::Process(mut p) => {
                         let exit_status = p.wait()?;
+                        println!("died: {}", p.get_process().id());
 
                         if exit_status.success() {
                             res.push(None);
@@ -65,7 +66,7 @@ fn handle_event(
                                     EpollEntryType::StdErr(_) => unreachable!(),
                                 }
                             });
-
+                            println!("exit code after sim: {}",exit_status);
                             return Err(match exit_status.code() {
                             // 137 => Stands for container killing itself (by SIGKILL)
                             // that will be due to contraint provided
@@ -123,15 +124,15 @@ fn copy_files(
     let (to_copy_dir, player_code_file) = match player_code.language {
         Language::CPP => (
             "player_code/cpp",
-            format!("{}/{}.cpp", game_dir_handle.get_path(), file_name),
+            format!("{}/runpvp.cpp", game_dir_handle.get_path()),
         ),
         Language::PYTHON => (
             "player_code/python",
-            format!("{}/{}.py", game_dir_handle.get_path(), file_name),
+            format!("{}/runpvp.py", game_dir_handle.get_path()),
         ),
         Language::JAVA => (
             "player_code/java",
-            format!("{}/{}.java", game_dir_handle.get_path(), file_name),
+            format!("{}/Run.java", game_dir_handle.get_path()),
         ),
     };
 
@@ -288,7 +289,7 @@ impl Handler for PvPGameRequest {
         let player2_file_name = "player2".to_string();
 
         // to_copy_dir = "player_code/cpp"
-        // player_code_file = "/etc/{game_id}/run.cpp"
+        // player_code_file = "/etc/{game_id}/player1.cpp"
 
         if let Some(resp) = copy_files(
             &self.game_id,
@@ -328,7 +329,7 @@ impl Handler for PvPGameRequest {
                 let (p2_r, sim_p2_w) = p4.get_ends().unwrap();
                 let (sim_r, sim_w) = p5.get_ends().unwrap();
 
-                send_initial_pvp_input(vec![&p1_w, &p2_w, &sim_w], &self);
+                send_initial_pvp_input(vec![&sim_p1_w, &sim_p2_w, &sim_w], &self);
 
                 let runner1 = get_runner(
                     &self.player1,
@@ -356,6 +357,15 @@ impl Handler for PvPGameRequest {
                         sim_p2_r.as_raw_fd(),
                         sim_p2_w.as_raw_fd(),
                     )?;
+
+                    println!("player1_process={}", player1_process.id());
+                    println!("player2_process={}", player2_process.id());
+                    println!("sim_process={}", sim_process.id());
+
+                    println!("sim_p1_r={}", sim_p1_r.as_raw_fd());
+                    println!("sim_p1_w={}", sim_p1_w.as_raw_fd());
+                    println!("sim_p2_r={}", sim_p2_r.as_raw_fd());
+                    println!("sim_p2_w={}", sim_p2_w.as_raw_fd());
 
                     let player1_stderr = player1_process.stderr.take().unwrap();
                     let player2_stderr = player2_process.stderr.take().unwrap();

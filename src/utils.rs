@@ -39,7 +39,7 @@ pub fn send_initial_parameters<'a>(
         .write_all(
             format!(
                 "{} {}\n",
-                game_parameters.no_of_turns, game_parameters.no_of_coins
+                "5", "100"
             )
             .as_bytes(),
         )
@@ -51,12 +51,13 @@ pub fn send_initial_parameters<'a>(
         writer
             .write_all(
                 format!(
-                    "{} {} {} {} {}\n",
+                    "{} {} {} {} {} {}\n",
                     attacker.hp,
                     attacker.range,
                     attacker.attack_power,
                     attacker.speed,
-                    attacker.price
+                    attacker.price,
+                    attacker.is_aerial
                 )
                 .as_bytes(),
             )
@@ -67,41 +68,20 @@ pub fn send_initial_parameters<'a>(
         .unwrap();
     for defender in &game_parameters.defenders {
         writer
-            .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
+            .write_all(
+                format!(
+                    "{} {} {} {} {} {}\n",
+                    defender.hp,
+                    defender.range,
+                    defender.attack_power,
+                    0,
+                    defender.price,
+                    defender.is_aerial
+                )
+                .as_bytes(),
+            )
             .unwrap();
-        for attacker in &game_parameters.attackers {
-            writer
-                .write_all(
-                    format!(
-                        "{} {} {} {} {} {}\n",
-                        attacker.hp,
-                        attacker.range,
-                        attacker.attack_power,
-                        attacker.speed,
-                        attacker.price,
-                        attacker.is_aerial
-                    )
-                    .as_bytes(),
-                )
-                .unwrap();
-        for defender in &game_parameters.defenders {
-            writer
-                .write_all(
-                    format!(
-                        "{} {} {} {} {} {}\n",
-                        defender.hp,
-                        defender.range,
-                        defender.attack_power,
-                        0,
-                        defender.price,
-                        defender.is_aerial
-                    )
-                    .as_bytes(),
-                )
-                .unwrap();
         }
-    }
-}
 
     writer
 }
