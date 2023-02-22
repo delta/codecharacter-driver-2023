@@ -23,7 +23,7 @@ jobs:
           toolchain: nightly
           override: true
       - name: Copy config
-        run: cp config.example.toml config.toml
+        run: cp .cargo/config.example.toml .cargo/config.toml
       - name: Build
         run: cargo build --verbose
       - name: Run tests

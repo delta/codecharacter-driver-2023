@@ -10,6 +10,7 @@ pub struct Attacker {
     pub attack_power: u32,
     pub speed: u32,
     pub price: u32,
+    pub is_aerial: u32,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -19,6 +20,7 @@ pub struct Defender {
     pub range: u32,
     pub attack_power: u32,
     pub price: u32,
+    pub is_aerial: u32,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -62,7 +64,7 @@ mod tests {
     #[test]
     pub fn deserealization_test() {
         // An example request that we might get from backend
-        let example_request = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1}],"no_of_turns":500,"no_of_coins":1000},"source_code":"print(x)","language":"PYTHON","map":"[[1,0],[0,2]]"}"#;
+        let example_request = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"source_code":"print(x)","language":"PYTHON","map":"[[1,0],[0,2]]"}"#;
 
         let expected_deserealized_struct = GameRequest {
             game_id: "0fa0f12d-d472-42d5-94b4-011e0c916023".to_owned(),
@@ -75,6 +77,7 @@ mod tests {
                         attack_power: 3,
                         speed: 3,
                         price: 1,
+                        is_aerial: 0,
                     },
                     Attacker {
                         id: 2,
@@ -83,6 +86,7 @@ mod tests {
                         attack_power: 3,
                         speed: 3,
                         price: 1,
+                        is_aerial: 1,
                     },
                 ],
                 defenders: vec![
@@ -92,6 +96,7 @@ mod tests {
                         range: 4,
                         attack_power: 5,
                         price: 1,
+                        is_aerial: 1,
                     },
                     Defender {
                         id: 2,
@@ -99,6 +104,7 @@ mod tests {
                         range: 6,
                         attack_power: 5,
                         price: 1,
+                        is_aerial: 1,
                     },
                 ],
                 no_of_turns: 500,

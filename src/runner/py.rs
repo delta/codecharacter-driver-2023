@@ -1,11 +1,11 @@
 use std::{
+    env,
     fs::File,
     os::linux::process::CommandExt,
     process::{Command, Stdio},
-    env
 };
 
-use crate::{error::SimulatorError};
+use crate::error::SimulatorError;
 
 use super::Runnable;
 
@@ -29,17 +29,24 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}", env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_python_runner", self.game_id),
                 "-i",
                 "-v",
-                format!("{}/run.py:/player_code/run.py", self.current_dir.as_str()).as_str(),
-                "ghcr.io/delta/codecharacter-python-runner:latest",
+                format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
+                &env::var("PYTHON_RUNNER_IMAGE").unwrap(),
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)

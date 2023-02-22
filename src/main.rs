@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::env;
+use std::{env, sync::Arc};
 
 use cc_driver::{
     create_error_response, create_executing_response,
@@ -13,7 +12,7 @@ use cc_driver::{
     },
     request::{GameRequest, Language},
     response::GameStatus,
-    runner::{cpp, java, py, simulator, Runnable}
+    runner::{cpp, java, py, simulator, Runnable},
 };
 use log::{info, LevelFilter};
 use log4rs::{
@@ -29,7 +28,10 @@ use nix::sys::epoll::EpollFlags;
 fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
 ) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
-    let events = epoll_handle.poll(env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(), epoll_handle.get_registered_fds().len())?;
+    let events = epoll_handle.poll(
+        env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(),
+        epoll_handle.get_registered_fds().len(),
+    )?;
     let mut res = vec![];
     for e in events {
         match epoll_handle.process_event(e)? {
@@ -265,9 +267,9 @@ fn main() {
     let _handle = log4rs::init_config(config).unwrap();
 
     let res = consumer(
-        "amqp://guest:guest@localhost".to_owned(),
-        "gameRequestQueue".to_owned(),
-        "gameStatusUpdateQueue".to_owned(),
+        env::var("RABBITMQ_HOST").unwrap(),
+        env::var("REQUEST_QUEUE").unwrap(),
+        env::var("RESPONSE_QUEUE").unwrap(),
         worker_fn,
     );
 
