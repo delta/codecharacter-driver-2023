@@ -1,4 +1,4 @@
-use std::{sync::Arc, env};
+use std::{env, sync::Arc};
 
 use cc_driver::{
     create_error_response, create_executing_response,
@@ -12,7 +12,7 @@ use cc_driver::{
     },
     request::{GameRequest, Language},
     response::GameStatus,
-    runner::{cpp, java, py, simulator, Runnable}
+    runner::{cpp, java, py, simulator, Runnable},
 };
 use log::{info, LevelFilter};
 use log4rs::{
@@ -28,7 +28,10 @@ use nix::sys::epoll::EpollFlags;
 fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
 ) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
-    let events = epoll_handle.poll(env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(), epoll_handle.get_registered_fds().len())?;
+    let events = epoll_handle.poll(
+        env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(),
+        epoll_handle.get_registered_fds().len(),
+    )?;
     let mut res = vec![];
     for e in events {
         match epoll_handle.process_event(e)? {

@@ -1,13 +1,11 @@
 use std::{
+    env,
     fs::File,
     os::linux::process::CommandExt,
     process::{Child, Command, Stdio},
-    env
 };
 
-use crate::{
-    error::SimulatorError
-};
+use crate::error::SimulatorError;
 
 use super::Runnable;
 
@@ -31,21 +29,22 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("COMPILATION_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1.5",
                 "--ulimit",
-                &format!("cpu={}:{}", env::var("COMPILATION_TIME_LIMIT").unwrap(), env::var("COMPILATION_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("COMPILATION_TIME_LIMIT").unwrap(),
+                    env::var("COMPILATION_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_java_compiler", self.game_id),
                 "-v",
-                format!(
-                    "{}/Run.java:/player_code/Run.java",
-                    self.current_dir.as_str()
-                )
-                .as_str(),
-                "-v",
-                format!("{}/run.jar:/player_code/run.jar", self.current_dir.as_str()).as_str(),
+                format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
                 &env::var("JAVA_COMPILER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
@@ -73,10 +72,17 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}", env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_java_runner", self.game_id),
