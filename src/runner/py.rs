@@ -36,17 +36,10 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", "100m"),
-                &format!(
-                    "--memory-swap={}",
-                    "100m"
-                ),
+                &format!("--memory-swap={}", "100m"),
                 "--cpus=1",
                 "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                    "10",
-                    "10"
-                ),
+                &format!("cpu={}:{}", "10", "10"),
                 "--rm",
                 "--name",
                 &format!("{}_python_runner", self.game_id),

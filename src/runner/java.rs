@@ -31,17 +31,10 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", "300m"),
-                &format!(
-                    "--memory-swap={}",
-                    "300m"
-                ),
+                &format!("--memory-swap={}", "300m"),
                 "--cpus=1.5",
                 "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                   "5",
-                   "5"
-                ),
+                &format!("cpu={}:{}", "5", "5"),
                 "--rm",
                 "--name",
                 &format!("{}_java_compiler", self.game_id),
@@ -75,17 +68,10 @@ impl Runnable for Runner {
             .args([
                 "run",
                 &format!("--memory={}", "100m"),
-                &format!(
-                    "--memory-swap={}",
-                    "100m"
-                ),
+                &format!("--memory-swap={}", "100m"),
                 "--cpus=1",
                 "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                    "10",
-                    "10"
-                ),
+                &format!("cpu={}:{}", "10", "10"),
                 "--rm",
                 "--name",
                 &format!("{}_java_runner", self.game_id),

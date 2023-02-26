@@ -36,13 +36,7 @@ pub fn send_initial_parameters<'a>(
     game_parameters: &'a GameParameters,
 ) -> BufWriter<&'a File> {
     writer
-        .write_all(
-            format!(
-                "{} {}\n",
-                "500", "1000"
-            )
-            .as_bytes(),
-        )
+        .write_all(format!("{} {}\n", "500", "1000").as_bytes())
         .unwrap();
     writer
         .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
