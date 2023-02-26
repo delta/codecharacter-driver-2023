@@ -94,23 +94,23 @@ fn get_runner(
     player_code: &PlayerCode,
     game_id: &String,
     game_dir_handle: &GameDir,
-    file_name: &String,
+    player_dir: &String,
 ) -> Box<dyn Runnable> {
     match player_code.language {
         Language::CPP => Box::new(cpp::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
         Language::PYTHON => Box::new(py::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
         Language::JAVA => Box::new(java::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
     }
 }
@@ -119,16 +119,16 @@ fn copy_files(
     game_id: &String,
     player_code: &PlayerCode,
     game_dir_handle: &GameDir,
-    file_name: &String,
+    player_dir: &String,
 ) -> Option<GameStatus> {
     let (to_copy_dir, player_code_file) = match player_code.language {
         Language::CPP => (
             "player_code/cpp",
-            format!("{}/runpvp.cpp", game_dir_handle.get_path()),
+            format!("{}/{}/runpvp.cpp", game_dir_handle.get_path(), player_dir),
         ),
         Language::PYTHON => (
             "player_code/python",
-            format!("{}/runpvp.py", game_dir_handle.get_path()),
+            format!("{}/{}/runpvp.py", game_dir_handle.get_path(), player_dir),
         ),
         Language::JAVA => (
             "player_code/java",
@@ -138,7 +138,7 @@ fn copy_files(
 
     make_copy(
         to_copy_dir,
-        game_dir_handle.get_path(),
+        format!("{}/{}", game_dir_handle.get_path(), player_dir).as_str(),
         &player_code_file,
         game_id,
         player_code,
@@ -151,6 +151,7 @@ impl Handler for NormalGameRequest {
             "Starting normal game execution for {} with language {:?}",
             self.game_id, self.player_code.language
         );
+        let player_dir = "player".to_string();
         let game_dir_handle = GameDir::new(&self.game_id);
 
         if game_dir_handle.is_none() {
@@ -161,13 +162,13 @@ impl Handler for NormalGameRequest {
         }
 
         let game_dir_handle = game_dir_handle.unwrap();
-        let file_name = "run".to_string();
+        game_dir_handle.create_sub_dir(player_dir.as_str());
 
         if let Some(resp) = copy_files(
             &self.game_id,
             &self.player_code,
             &game_dir_handle,
-            &file_name,
+            &player_dir,
         ) {
             return resp;
         }
@@ -189,7 +190,7 @@ impl Handler for NormalGameRequest {
                     &self.player_code,
                     &self.game_id,
                     &game_dir_handle,
-                    &file_name,
+                    &player_dir,
                 );
 
                 let initialize = || -> Result<_, SimulatorError> {
@@ -275,7 +276,10 @@ impl Handler for PvPGameRequest {
             "Starting pvp game execution for {} with languages player1: {:?} and player2: {:?}",
             self.game_id, self.player1.language, self.player2.language
         );
+        let player1_dir = "player1";
+        let player2_dir = "player2";
         let game_dir_handle = GameDir::new(&self.game_id);
+
 
         if game_dir_handle.is_none() {
             return create_error_response(
@@ -285,17 +289,17 @@ impl Handler for PvPGameRequest {
         }
 
         let game_dir_handle = game_dir_handle.unwrap();
-        let player1_file_name = "player1".to_string();
-        let player2_file_name = "player2".to_string();
+        game_dir_handle.create_sub_dir(player1_dir);
+        game_dir_handle.create_sub_dir(player2_dir);
 
         // to_copy_dir = "player_code/cpp"
-        // player_code_file = "/etc/{game_id}/player1.cpp"
+        // player_code_file = "/etc/{game_id}/{player}/runpvp.cpp"
 
         if let Some(resp) = copy_files(
             &self.game_id,
             &self.player1,
             &game_dir_handle,
-            &player1_file_name,
+            &player1_dir.to_string(),
         ) {
             return resp;
         }
@@ -304,7 +308,7 @@ impl Handler for PvPGameRequest {
             &self.game_id,
             &self.player2,
             &game_dir_handle,
-            &player2_file_name,
+            &player2_dir.to_string(),
         ) {
             return resp;
         }
@@ -335,13 +339,13 @@ impl Handler for PvPGameRequest {
                     &self.player1,
                     &self.game_id,
                     &game_dir_handle,
-                    &player1_file_name,
+                    &player1_dir.to_string(),
                 );
                 let runner2 = get_runner(
                     &self.player2,
                     &self.game_id,
                     &game_dir_handle,
-                    &player2_file_name,
+                    &player2_dir.to_string(),
                 );
 
                 let initialize = || -> Result<_, SimulatorError> {

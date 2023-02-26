@@ -12,15 +12,15 @@ use super::{GameType, Runnable};
 pub struct Runner {
     current_dir: String,
     game_id: String,
-    file_name: String,
+    player_dir: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, player_dir: String) -> Self {
         Runner {
             current_dir,
             game_id,
-            file_name,
+            player_dir,
         }
     }
 }
@@ -44,18 +44,12 @@ impl Runnable for Runner {
         //         ),
         //         "--rm",
         //         "--name",
-        //         &format!("{}_{}_cpp_compiler", self.game_id, self.file_name),
+        //         &format!("{}_{}_cpp_compiler", self.game_id, self.player_dir),
         //         "-v",
         //         format!(
-        //             "{}/runpvp.cpp:/player_code/runpvp.cpp",
+        //             "{}/{}:/player_code/",
         //             self.current_dir.as_str(),
-        //         )
-        //         .as_str(),
-        //         "-v",
-        //         format!(
-        //             "{}/{}:/player_code/run",
-        //             self.current_dir.as_str(),
-        //             self.file_name.as_str()
+        //             self.player_dir.as_str()
         //         )
         //         .as_str(),
         //         "ghcr.io/delta/codecharacter-cpp-compiler:latest"
@@ -98,20 +92,14 @@ impl Runnable for Runner {
                 // ),
                 // "--rm",
                 // "--name",
-                // &format!("{}_{}_cpp_runner", self.game_id, self.file_name),
+                // &format!("{}_{}_cpp_runner", self.game_id, self.player_dir),
                 // "-i",
                 // "-v",
                 // &format!(
-                //     "{}/{}:/player_code",
+                //     "{}/{}/run:/player_code",
                 //     self.current_dir.as_str(),
-                //     self.file_name.as_str()
+                //     self.player_dir.as_str()
                 // ),
-                // "-v",
-                // format!(
-                //     "{}/run.cpp:/out.txt",
-                //     self.current_dir.as_str()
-                // )
-                // .as_str(),
                 // "ghcr.io/delta/codecharacter-cpp-runner:latest",
                 // pass the type of game we want to execute
                 &game_type.to_string(),
