@@ -5,10 +5,16 @@ pub struct GameDir {
 impl GameDir {
     pub fn new(game_id: &str) -> Option<Self> {
         std::fs::create_dir(format!("/tmp/{game_id}")).ok()?;
+
         Some(GameDir {
             full_path: format!("/tmp/{game_id}"),
         })
     }
+
+    pub fn create_sub_dir(&self, sub_dir: &str) -> Option<()> {
+        std::fs::create_dir(format!("{}/{}", self.full_path, sub_dir)).ok()
+    }
+
     pub fn get_path(&self) -> &str {
         &self.full_path
     }

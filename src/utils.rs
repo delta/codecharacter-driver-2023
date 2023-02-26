@@ -39,7 +39,7 @@ pub fn send_initial_parameters<'a>(
         .write_all(
             format!(
                 "{} {}\n",
-                "5", "100"
+                "500", "1000"
             )
             .as_bytes(),
         )

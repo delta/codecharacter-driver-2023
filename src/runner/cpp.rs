@@ -12,15 +12,15 @@ use super::{GameType, Runnable};
 pub struct Runner {
     current_dir: String,
     game_id: String,
-    file_name: String,
+    player_dir: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, player_dir: String) -> Self {
         Runner {
             current_dir,
             game_id,
-            file_name,
+            player_dir,
         }
     }
 }
