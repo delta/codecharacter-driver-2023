@@ -12,15 +12,15 @@ use super::{GameType, Runnable};
 pub struct Runner {
     current_dir: String,
     game_id: String,
-    file_name: String,
+    player_dir: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, player_dir: String) -> Self {
         Runner {
             current_dir,
             game_id,
-            file_name,
+            player_dir,
         }
     }
 }
@@ -35,17 +35,29 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", "100m"),
-                &format!("--memory-swap={}", "100m"),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}", "10", "10"),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
-                &format!("{}_python_runner", self.game_id),
+                &format!("{}_{}_python_runner", self.game_id, self.player_dir),
                 "-i",
                 "-v",
-                format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
+                format!(
+                    "{}/{}/:/player_code/",
+                    self.current_dir.as_str(),
+                    self.player_dir
+                )
+                .as_str(),
                 &env::var("PYTHON_RUNNER_IMAGE").unwrap(),
                 &game_type.to_string(),
             ])

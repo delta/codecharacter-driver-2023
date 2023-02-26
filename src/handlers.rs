@@ -25,7 +25,10 @@ pub trait Handler {
 fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
 ) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
-    let events = epoll_handle.poll(30_000, epoll_handle.get_registered_fds().len())?;
+    let events = epoll_handle.poll(
+        env::var("EPOLL_WAIT_TIMEOUT").unwrap().parse().unwrap(),
+        epoll_handle.get_registered_fds().len(),
+    )?;
     let mut res = vec![];
     for e in events {
         match epoll_handle.process_event(e)? {
@@ -63,7 +66,7 @@ fn handle_event(
                                     EpollEntryType::StdErr(_) => unreachable!(),
                                 }
                             });
-                            println!("exit code after sim: {}", exit_status);
+                            println!("exit code after sim: {exit_status}");
                             return Err(match exit_status.code() {
                             // 137 => Stands for container killing itself (by SIGKILL)
                             // that will be due to contraint provided

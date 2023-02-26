@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::File,
     io::{BufWriter, Write},
 };
@@ -51,7 +50,7 @@ pub fn send_initial_parameters<'a>(
                     attacker.attack_power,
                     attacker.speed,
                     attacker.price,
-                    attacker.is_aerial
+                    attacker.is_aerial,
                 )
                 .as_bytes(),
             )
@@ -75,7 +74,7 @@ pub fn send_initial_parameters<'a>(
                 .as_bytes(),
             )
             .unwrap();
-        }
+    }
 
     writer
 }

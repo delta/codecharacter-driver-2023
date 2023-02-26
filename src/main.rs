@@ -53,10 +53,10 @@ fn main() {
     let _handle = log4rs::init_config(config).unwrap();
 
     let res = consumer(
-        "amqp://guest:guest@localhost".to_owned(),
-        "gameRequestQueue".to_owned(),
-        "gamePvpRequestQueue".to_owned(),
-        "gameStatusUpdateQueue".to_owned(),
+        env::var("RABBITMQ_HOST").unwrap(),
+        env::var("REQUEST_QUEUE").unwrap(),
+        env::var("PVP_REQUEST_QUEUE").unwrap(),
+        env::var("RESPONSE_QUEUE").unwrap(),
         worker_fn,
     );
 
