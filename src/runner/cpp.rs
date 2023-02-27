@@ -46,7 +46,7 @@ impl Runnable for Runner {
                 "--name",
                 &format!("{}_{}_cpp_compiler", self.game_id, self.player_dir),
                 "-v",
-                format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
+                format!("{}/{}:/player_code/", self.current_dir, self.player_dir).as_str(),
                 &env::var("CPP_COMPILER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
@@ -90,7 +90,7 @@ impl Runnable for Runner {
                 &format!("{}_{}_cpp_runner", self.game_id, self.player_dir),
                 "-i",
                 "-v",
-                format!("{}/run:/player_code", self.current_dir.as_str()).as_str(),
+                format!("{}/{}/run:/player_code", self.current_dir, self.player_dir).as_str(),
                 &env::var("CPP_RUNNER_IMAGE").unwrap(),
                 &game_type.to_string(),
             ])

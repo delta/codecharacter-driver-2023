@@ -120,19 +120,35 @@ fn copy_files(
     player_code: &PlayerCode,
     game_dir_handle: &GameDir,
     player_dir: &String,
+    game_type: &GameType,
 ) -> Option<GameStatus> {
     let (to_copy_dir, player_code_file) = match player_code.language {
         Language::CPP => (
             "player_code/cpp",
-            format!("{}/{}/runpvp.cpp", game_dir_handle.get_path(), player_dir),
+            format!(
+                "{}/{}/{}.cpp",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::CPP)
+            ),
         ),
         Language::PYTHON => (
             "player_code/python",
-            format!("{}/{}/runpvp.py", game_dir_handle.get_path(), player_dir),
+            format!(
+                "{}/{}/{}.py",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::PYTHON)
+            ),
         ),
         Language::JAVA => (
             "player_code/java",
-            format!("{}/Run.java", game_dir_handle.get_path()),
+            format!(
+                "{}/{}/{}.java",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::JAVA)
+            ),
         ),
     };
 
@@ -169,6 +185,7 @@ impl Handler for NormalGameRequest {
             &self.player_code,
             &game_dir_handle,
             &player_dir,
+            &GameType::NormalGame,
         ) {
             return resp;
         }
@@ -299,6 +316,7 @@ impl Handler for PvPGameRequest {
             &self.player1,
             &game_dir_handle,
             &player1_dir.to_string(),
+            &GameType::PvPGame,
         ) {
             return resp;
         }
@@ -308,6 +326,7 @@ impl Handler for PvPGameRequest {
             &self.player2,
             &game_dir_handle,
             &player2_dir.to_string(),
+            &GameType::PvPGame,
         ) {
             return resp;
         }

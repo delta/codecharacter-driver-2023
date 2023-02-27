@@ -29,24 +29,24 @@ impl Simulator {
             "/home/ashwani/Dev/Projects/Code-Character/codecharacter-simulator-2023/build/bin/main",
         )
         .args([
-            "run",
-            &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-            &format!(
-                "--memory-swap={}",
-                env::var("RUNTIME_MEMORY_LIMIT").unwrap()
-            ),
-            "--cpus=1",
-            "--ulimit",
-            &format!(
-                "cpu={}:{}",
-                env::var("RUNTIME_TIME_LIMIT").unwrap(),
-                env::var("RUNTIME_TIME_LIMIT").unwrap()
-            ),
-            "--rm",
-            "--name",
-            &format!("{}_simulator", self.game_id),
-            "-i",
-            &env::var("SIMULATOR_IMAGE").unwrap(),
+            // "run",
+            // &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+            // &format!(
+            //     "--memory-swap={}",
+            //     env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+            // ),
+            // "--cpus=1",
+            // "--ulimit",
+            // &format!(
+            //     "cpu={}:{}",
+            //     env::var("RUNTIME_TIME_LIMIT").unwrap(),
+            //     env::var("RUNTIME_TIME_LIMIT").unwrap()
+            // ),
+            // "--rm",
+            // "--name",
+            // &format!("{}_simulator", self.game_id),
+            // "-i",
+            // &env::var("SIMULATOR_IMAGE").unwrap(),
             "--type=PvP",
             &format!("p1_in={p1_r}"),
             &format!("p1_out={p1_w}"),

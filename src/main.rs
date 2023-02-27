@@ -53,7 +53,12 @@ fn main() {
     let _handle = log4rs::init_config(config).unwrap();
 
     let res = consumer(
-        env::var("RABBITMQ_HOST").unwrap(),
+        format!(
+            "amqp://{}:{}@{}",
+            env::var("RABBITMQ_USERNAME").unwrap(),
+            env::var("RABBITMQ_PASSWORD").unwrap(),
+            env::var("RABBITMQ_HOST").unwrap()
+        ),
         env::var("REQUEST_QUEUE").unwrap(),
         env::var("PVP_REQUEST_QUEUE").unwrap(),
         env::var("RESPONSE_QUEUE").unwrap(),
