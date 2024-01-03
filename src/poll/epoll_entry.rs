@@ -110,6 +110,7 @@ impl ProcessOutput {
         }
 
         self.output.push_str(buf.as_str());
+        println!("{}", self.output);
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ pub enum SimulatorError {
     FifoCreationError(String),
     EpollError(String),
     TimeOutError(String),
+    RabbitMqError(String),
 }
 
 #[derive(Debug)]

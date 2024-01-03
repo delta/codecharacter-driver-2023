@@ -6,7 +6,11 @@ use std::{
 
 use fs_extra::dir::CopyOptions;
 
-use crate::{create_error_response, error, request::GameRequest, response};
+use crate::{
+    create_error_response, error,
+    request::{GameParameters, NormalGameRequest, PlayerCode, PvPGameRequest, Language},
+    response::{self, GameStatus}, game_dir::GameDir,
+};
 
 pub fn copy_dir_all(
     src: impl AsRef<std::path::Path>,
@@ -27,62 +31,70 @@ pub fn copy_dir_all(
     Ok(())
 }
 
-pub fn send_initial_input(fifos: Vec<&File>, game_request: &GameRequest) {
-    let game_parameters = &game_request.parameters;
-    for fifo in fifos {
-        let mut writer = BufWriter::new(fifo);
+pub fn send_initial_parameters<'a>(
+    mut writer: BufWriter<&'a File>,
+    game_parameters: &'a GameParameters,
+) -> BufWriter<&'a File> {
+    writer
+        .write_all(format!("{} {}\n", "5", "1000").as_bytes())
+        .unwrap();
+    writer
+        .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
+        .unwrap();
+    for attacker in &game_parameters.attackers {
         writer
             .write_all(
                 format!(
-                    "{} {}\n",
-                    game_parameters.no_of_turns, game_parameters.no_of_coins
+                    "{} {} {} {} {} {}\n",
+                    attacker.hp,
+                    attacker.range,
+                    attacker.attack_power,
+                    attacker.speed,
+                    attacker.price,
+                    "0",
                 )
                 .as_bytes(),
             )
             .unwrap();
+    }
+    writer
+        .write_all(format!("{}\n", game_parameters.defenders.len()).as_bytes())
+        .unwrap();
+    for defender in &game_parameters.defenders {
         writer
-            .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
-            .unwrap();
-        for attacker in &game_parameters.attackers {
-            writer
-                .write_all(
-                    format!(
-                        "{} {} {} {} {} {}\n",
-                        attacker.hp,
-                        attacker.range,
-                        attacker.attack_power,
-                        attacker.speed,
-                        attacker.price,
-                        attacker.is_aerial
-                    )
-                    .as_bytes(),
+            .write_all(
+                format!(
+                    "{} {} {} {} {} {}\n",
+                    defender.hp,
+                    defender.range,
+                    defender.attack_power,
+                    0,
+                    defender.price,
+                    0
                 )
-                .unwrap();
-        }
-        writer
-            .write_all(format!("{}\n", game_parameters.defenders.len()).as_bytes())
+                .as_bytes(),
+            )
             .unwrap();
-        for defender in &game_parameters.defenders {
-            writer
-                .write_all(
-                    format!(
-                        "{} {} {} {} {} {}\n",
-                        defender.hp,
-                        defender.range,
-                        defender.attack_power,
-                        0,
-                        defender.price,
-                        defender.is_aerial
-                    )
-                    .as_bytes(),
-                )
-                .unwrap();
-        }
-        let map_size: u32 = env::var("MAP_SIZE").unwrap().parse().unwrap();
-        writer
-            .write_all(format!("{map_size} {map_size}\n").as_bytes())
-            .unwrap();
-        for row in game_request.map.iter() {
+    }
+
+    writer
+}
+
+pub fn send_initial_pvp_input(fifos: Vec<&File>, pvp_request: &PvPGameRequest) {
+    for fifo in fifos {
+        let writer = BufWriter::new(fifo);
+        let _ = send_initial_parameters(writer, &pvp_request.parameters);
+    }
+}
+
+pub fn send_initial_input(fifos: Vec<&File>, normal_game_request: &NormalGameRequest) {
+    for fifo in fifos {
+        let writer = BufWriter::new(fifo);
+        let mut writer = send_initial_parameters(writer, &normal_game_request.parameters);
+
+        writer.write_all("64 64\n".as_bytes()).unwrap();
+
+        for row in normal_game_request.map.iter() {
             for cell in row.iter() {
                 writer.write_all(format!("{cell} ").as_bytes()).unwrap();
             }
@@ -95,11 +107,12 @@ pub fn make_copy(
     src_dir: &str,
     dest_dir: &str,
     player_code_file: &str,
-    game_request: &GameRequest,
+    game_id: &String,
+    player_code: &PlayerCode,
 ) -> Option<response::GameStatus> {
     if let Err(e) = copy_dir_all(src_dir, dest_dir) {
         return Some(create_error_response(
-            game_request,
+            game_id.clone(),
             error::SimulatorError::UnidentifiedError(format!(
                 "Failed to copy player code boilerplate: {e}"
             )),
@@ -107,13 +120,44 @@ pub fn make_copy(
     }
 
     if let Err(e) = std::fs::File::create(player_code_file).and_then(|mut file| {
-        file.write_all(game_request.source_code.as_bytes())
+        file.write_all(player_code.source_code.as_bytes())
             .and_then(|_| file.sync_all())
     }) {
         return Some(create_error_response(
-            game_request,
+            game_id.to_owned(),
             error::SimulatorError::UnidentifiedError(format!("Failed to copy player code: {e}")),
         ));
     }
     None
+}
+
+pub fn copy_files(
+    game_id: &String,
+    player_code: &PlayerCode,
+    game_dir_handle: &GameDir,
+    game_type_dir: &String,
+    file_name: &String,
+) -> Option<GameStatus> {
+    let (to_copy_dir, player_code_file) = match player_code.language {
+        Language::CPP => (
+            format!("{}/{}", "player_code/cpp", game_type_dir),
+            format!("{}/{}.cpp", game_dir_handle.get_path(), file_name),
+        ),
+        Language::PYTHON => (
+            format!("{}/{}", "player_code/python", game_type_dir),
+            format!("{}/runpvp.py", game_dir_handle.get_path()),
+        ),
+        Language::JAVA => (
+            format!("{}/{}", "player_code/java", game_type_dir),
+            format!("{}/Run.java", game_dir_handle.get_path()),
+        ),
+    };
+
+    make_copy(
+        to_copy_dir.as_str(),
+        game_dir_handle.get_path(),
+        &player_code_file,
+        game_id,
+        player_code,
+    )
 }

@@ -4,3 +4,5 @@ Cargo.lock
 driver.log
 codecharacter-driver-2022
 config.toml
+.vscode
+*.txt

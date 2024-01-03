@@ -7,45 +7,53 @@ use std::{
 
 use crate::error::SimulatorError;
 
-use super::Runnable;
+use super::{GameType, Runnable};
 
 pub struct Runner {
     current_dir: String,
     game_id: String,
+    file_name: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
         Runner {
             current_dir,
             game_id,
+            file_name,
         }
     }
 }
 
 impl Runnable for Runner {
-    fn run(&self, stdin: File, stdout: File) -> Result<Child, SimulatorError> {
+    fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
-                &format!(
-                    "--memory-swap={}",
-                    env::var("COMPILATION_MEMORY_LIMIT").unwrap()
-                ),
+                &format!("--memory={}", "300m"),
+                &format!("--memory-swap={}", "300m"),
                 "--cpus=1.5",
                 "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                    env::var("COMPILATION_TIME_LIMIT").unwrap(),
-                    env::var("COMPILATION_TIME_LIMIT").unwrap()
-                ),
+                &format!("cpu={}:{}", "5", "5"),
                 "--rm",
                 "--name",
                 &format!("{}_java_compiler", self.game_id),
                 "-v",
-                format!("{}/:/player_code/", self.current_dir.as_str()).as_str(),
-                &env::var("JAVA_COMPILER_IMAGE").unwrap(),
+                format!(
+                    "{}/{}.java:/player_code/Run.java",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str(),
+                )
+                .as_str(),
+                "-v",
+                format!(
+                    "{}/{}.jar:/player_code/run.jar",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
+                "ghcr.io/delta/codecharacter-java-compiler:latest",
+                &game_type.to_string(),
             ])
             .current_dir(&self.current_dir)
             .stdout(Stdio::null())
@@ -71,25 +79,23 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!(
-                    "--memory-swap={}",
-                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
-                ),
+                &format!("--memory={}", "100m"),
+                &format!("--memory-swap={}", "100m"),
                 "--cpus=1",
                 "--ulimit",
-                &format!(
-                    "cpu={}:{}",
-                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
-                    env::var("RUNTIME_TIME_LIMIT").unwrap()
-                ),
+                &format!("cpu={}:{}", "10", "10"),
                 "--rm",
                 "--name",
                 &format!("{}_java_runner", self.game_id),
                 "-i",
                 "-v",
-                format!("{}/run.jar:/run.jar", self.current_dir.as_str()).as_str(),
-                &env::var("JAVA_RUNNER_IMAGE").unwrap(),
+                format!(
+                    "{}/{}.jar:/run.jar",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
+                "ghcr.io/delta/codecharacter-java-runner:latest",
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)
@@ -102,5 +108,45 @@ impl Runnable for Runner {
                     "Couldnt spawn the java runner process: {err}"
                 ))
             })
+    }
+
+    fn run2(
+        &self,
+        stdin: File,
+        stdout: File,
+        game_type: GameType,
+    ) -> Result<Child, SimulatorError> {
+        return Ok(Command::new("docker")
+            .args([
+                "run",
+                &format!("--memory={}", "100m"),
+                &format!("--memory-swap={}", "100m"),
+                "--cpus=1",
+                "--ulimit",
+                &format!("cpu={}:{}", "10", "10"),
+                "--rm",
+                "--name",
+                &format!("{}_java_runner", self.game_id),
+                "-i",
+                "-v",
+                format!(
+                    "{}/{}.jar:/run.jar",
+                    self.current_dir.as_str(),
+                    self.file_name.as_str()
+                )
+                .as_str(),
+                "ghcr.io/delta/codecharacter-java-runner:latest",
+            ])
+            .create_pidfd(true)
+            .current_dir(&self.current_dir)
+            .stdin(stdin)
+            .stdout(stdout)
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|err| {
+                SimulatorError::UnidentifiedError(format!(
+                    "Couldnt spawn the java runner process: {err}"
+                ))
+            })?);
     }
 }

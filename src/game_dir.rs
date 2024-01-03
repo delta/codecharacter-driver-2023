@@ -1,3 +1,6 @@
+use log::info;
+
+#[derive(Debug)]
 pub struct GameDir {
     full_path: String,
 }
@@ -5,6 +8,7 @@ pub struct GameDir {
 impl GameDir {
     pub fn new(game_id: &str) -> Option<Self> {
         std::fs::create_dir(format!("/tmp/{game_id}")).ok()?;
+        info!("Created dir /tmp/{game_id}");
         Some(GameDir {
             full_path: format!("/tmp/{game_id}"),
         })
