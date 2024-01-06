@@ -1,15 +1,16 @@
 use std::{
-    env,
     fs::File,
     io::{BufWriter, Write},
 };
 
+
 use fs_extra::dir::CopyOptions;
+use log::info;
 
 use crate::{
     create_error_response, error,
     request::{GameParameters, NormalGameRequest, PlayerCode, PvPGameRequest, Language},
-    response::{self, GameStatus}, game_dir::GameDir,
+    response::{self, GameStatus}, game_dir::GameDir, runner::GameType,
 };
 
 pub fn copy_dir_all(
@@ -17,12 +18,13 @@ pub fn copy_dir_all(
     dst: impl AsRef<std::path::Path>,
 ) -> std::io::Result<()> {
     let opt = CopyOptions::new();
+    info!("Copying dir from {:?} to {:?}", src.as_ref(), dst.as_ref());
     for entry in std::fs::read_dir(src).unwrap() {
         let entry = entry?;
         let ty = entry.file_type()?;
         if ty.is_dir() {
             fs_extra::dir::copy(entry.path(), dst.as_ref(), &opt)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", e)))?;
         } else {
             std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
         }
@@ -135,27 +137,42 @@ pub fn copy_files(
     game_id: &String,
     player_code: &PlayerCode,
     game_dir_handle: &GameDir,
-    game_type_dir: &String,
-    file_name: &String,
+    player_dir: &String,
+    game_type: &GameType,
 ) -> Option<GameStatus> {
     let (to_copy_dir, player_code_file) = match player_code.language {
         Language::CPP => (
-            format!("{}/{}", "player_code/cpp", game_type_dir),
-            format!("{}/{}.cpp", game_dir_handle.get_path(), file_name),
+            "player_code/cpp",
+            format!(
+                "{}/{}/{}.cpp",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::CPP)
+            ),
         ),
         Language::PYTHON => (
-            format!("{}/{}", "player_code/python", game_type_dir),
-            format!("{}/runpvp.py", game_dir_handle.get_path()),
+            "player_code/python",
+            format!(
+                "{}/{}/{}.py",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::PYTHON)
+            ),
         ),
         Language::JAVA => (
-            format!("{}/{}", "player_code/java", game_type_dir),
-            format!("{}/Run.java", game_dir_handle.get_path()),
+            "player_code/java",
+            format!(
+                "{}/{}/{}.java",
+                game_dir_handle.get_path(),
+                player_dir,
+                game_type.file_name(Language::JAVA)
+            ),
         ),
     };
 
     make_copy(
-        to_copy_dir.as_str(),
-        game_dir_handle.get_path(),
+        to_copy_dir,
+        format!("{}/{}", game_dir_handle.get_path(), player_dir).as_str(),
         &player_code_file,
         game_id,
         player_code,

@@ -7,12 +7,21 @@ pub struct GameDir {
 
 impl GameDir {
     pub fn new(game_id: &str) -> Option<Self> {
-        std::fs::create_dir(format!("/tmp/{game_id}")).ok()?;
+        let err = std::fs::create_dir(format!("/tmp/{game_id}"));
+        if let Err(e) = err {
+            info!("Failed to create dir /tmp/{game_id}: {e}");
+            return None;
+        }
         info!("Created dir /tmp/{game_id}");
         Some(GameDir {
             full_path: format!("/tmp/{game_id}"),
         })
     }
+
+    pub fn create_sub_dir(&self, sub_dir: &str) -> Option<()> {
+        std::fs::create_dir_all(format!("{}/{}", self.full_path, sub_dir)).ok()
+    }
+
     pub fn get_path(&self) -> &str {
         &self.full_path
     }

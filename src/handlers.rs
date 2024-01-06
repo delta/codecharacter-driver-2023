@@ -15,7 +15,7 @@ use crate::{
     request::{GameRequest, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
     response::GameStatus,
     runner::{cpp, java, py, simulator, GameType, Runnable},
-    utils::{copy_files, send_initial_input, send_initial_pvp_input},
+    utils::{copy_files, send_initial_input, send_initial_pvp_input}, create_final_pvp_response,
 };
 
 pub trait Handler {
@@ -48,6 +48,7 @@ fn handle_event(
                 match entry {
                     EpollEntryType::StdErr(_) => unreachable!(),
                     EpollEntryType::Process(mut p) => {
+                        info!("For process {}", p.get_process().id());
                         let exit_status = p.wait()?;
                         println!("died: {}", p.get_process().id());
 
@@ -68,7 +69,6 @@ fn handle_event(
                                     EpollEntryType::StdErr(_) => unreachable!(),
                                 }
                             });
-                            println!("exit code after sim: {}", exit_status);
                             return Err(match exit_status.code() {
                             // 137 => Stands for container killing itself (by SIGKILL)
                             // that will be due to contraint provided
@@ -96,23 +96,23 @@ fn get_runner(
     player_code: &PlayerCode,
     game_id: &String,
     game_dir_handle: &GameDir,
-    file_name: &String,
+    player_dir: &String,
 ) -> Box<dyn Runnable> {
     match player_code.language {
         Language::CPP => Box::new(cpp::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
         Language::PYTHON => Box::new(py::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
         Language::JAVA => Box::new(java::Runner::new(
             game_dir_handle.get_path().to_string(),
             game_id.to_string(),
-            file_name.to_owned(),
+            player_dir.to_owned(),
         )),
     }
 }
@@ -133,15 +133,14 @@ impl Handler for NormalGameRequest {
         }
 
         let game_dir_handle = game_dir_handle.unwrap();
-        let game_type_dir = "normal_game".to_string();
-        let file_name = "run".to_string();
+        let player_dir = "player".to_string();
 
         if let Some(resp) = copy_files(
             &self.game_id,
             &self.player_code,
             &game_dir_handle,
-            &game_type_dir,
-            &file_name,
+            &player_dir,
+            &GameType::NormalGame,
         ) {
             return resp;
         }
@@ -163,7 +162,7 @@ impl Handler for NormalGameRequest {
                     &self.player_code,
                     &self.game_id,
                     &game_dir_handle,
-                    &file_name,
+                    &player_dir,
                 );
 
                 let initialize = || -> Result<_, SimulatorError> {
@@ -225,8 +224,14 @@ impl Handler for NormalGameRequest {
                 let process2 = outputs.remove(0);
 
                 let (player_process_out, sim_process_out) = match process1.process_type() {
-                    ProcessType::Runner => (process1.output(), process2.output()),
+                    ProcessType::Runner  => (process1.output(), process2.output()),
                     ProcessType::Simulator => (process2.output(), process1.output()),
+                    _ => {
+                        return create_error_response(
+                            self.game_id.to_owned(),
+                            SimulatorError::UnidentifiedError("Failed to map outputs".to_owned()),
+                        );
+                    }
                 };
 
                 info!("Successfully executed for game {}", self.game_id);
@@ -249,10 +254,8 @@ impl Handler for PvPGameRequest {
             "Starting pvp game execution for {} with languages player1: {:?} and player2: {:?}",
             self.game_id, self.player1.language, self.player2.language
         );
-        info!("Initial Parameters.coins: {}", self.parameters.no_of_coins);
         let game_dir_handle = GameDir::new(&self.game_id);
 
-        info!("Game dir handle: {:?}", game_dir_handle);
 
         if game_dir_handle.is_none() {
             return create_error_response(
@@ -262,16 +265,18 @@ impl Handler for PvPGameRequest {
         }
 
         let game_dir_handle = game_dir_handle.unwrap();
-        let player1_game_type_dir = "pvp_game/player_1".to_string();
-        let player2_game_type_dir = "pvp_game/player_2".to_string();
-        let player_file_name = "run".to_string();
+        let player1_dir = "pvp_game/player_1";
+        let player2_dir = "pvp_game/player_2";
+
+        game_dir_handle.create_sub_dir(player1_dir);
+        game_dir_handle.create_sub_dir(player2_dir);
 
         if let Some(resp) = copy_files(
             &self.game_id,
             &self.player1,
             &game_dir_handle,
-            &player1_game_type_dir,
-            &player_file_name,
+            &player1_dir.to_string(),
+            &GameType::PvPGame,
         ) {
             return resp;
         }
@@ -280,8 +285,8 @@ impl Handler for PvPGameRequest {
             &self.game_id,
             &self.player2,
             &game_dir_handle,
-            &player2_game_type_dir,
-            &player_file_name,
+            &player2_dir.to_string(),
+            &GameType::PvPGame,
         ) {
             return resp;
         }
@@ -314,18 +319,18 @@ impl Handler for PvPGameRequest {
                     &self.player1,
                     &self.game_id,
                     &game_dir_handle,
-                    &player_file_name,
+                    &player1_dir.to_string(),
                 );
                 let runner2 = get_runner(
                     &self.player2,
                     &self.game_id,
                     &game_dir_handle,
-                    &player_file_name,
+                    &player2_dir.to_string(),
                 );
                 info!("Got runners");
                 let initialize = || -> Result<_, SimulatorError> {
                     let mut player1_process = runner1.run(p1_r, p1_w, GameType::PvPGame)?;
-                    let mut player2_process = runner2.run2(p2_r, p2_w, GameType::PvPGame)?;
+                    let mut player2_process = runner2.run(p2_r, p2_w, GameType::PvPGame)?;
                     let simulator = simulator::Simulator::new(self.game_id.to_string());
 
                     let mut sim_process = simulator.run_pvp(
@@ -351,12 +356,12 @@ impl Handler for PvPGameRequest {
 
                     let sim_stderr = sim_process.stderr.take().unwrap();
 
-                    let player1_process = Process::new(player1_process, ProcessType::Runner);
-                    let player2_process = Process::new(player2_process, ProcessType::Runner);
+                    let player1_process = Process::new(player1_process, ProcessType::RunnerPlayer1);
+                    let player2_process = Process::new(player2_process, ProcessType::RunnerPlayer2);
                     let sim_process = Process::new(sim_process, ProcessType::Simulator);
 
-                    let player1_output = ProcessOutput::new(player1_stderr, ProcessType::Runner);
-                    let player2_output = ProcessOutput::new(player2_stderr, ProcessType::Runner);
+                    let player1_output = ProcessOutput::new(player1_stderr, ProcessType::RunnerPlayer1);
+                    let player2_output = ProcessOutput::new(player2_stderr, ProcessType::RunnerPlayer2);
                     let sim_output = ProcessOutput::new(sim_stderr, ProcessType::Simulator);
 
                     let player1 = EpollEntryType::Process(player1_process);
@@ -397,6 +402,8 @@ impl Handler for PvPGameRequest {
                     Err(err) => return create_error_response(self.game_id.to_owned(), err),
                 };
 
+                info!("Crossed first possib");
+
                 let mut outputs: Vec<ProcessOutput> = vec![];
 
                 while !event_handler.is_empty() {
@@ -409,19 +416,45 @@ impl Handler for PvPGameRequest {
                     }
                 }
 
+                info!("Crossed second possib");
+
                 let process1 = outputs.remove(0);
                 let process2 = outputs.remove(0);
+                let process3 = outputs.remove(0);
 
-                let (player_process_out, sim_process_out) = match process1.process_type() {
-                    ProcessType::Runner => (process1.output(), process2.output()),
-                    ProcessType::Simulator => (process2.output(), process1.output()),
+                let (player1_process_out, player2_process_out, sim_process_out) = match (process1.process_type(), process2.process_type(), process3.process_type()) {
+                    (ProcessType::RunnerPlayer1, ProcessType::RunnerPlayer2, ProcessType::Simulator) => {
+                        (process1.output(), process2.output(), process3.output())
+                    },
+                    (ProcessType::RunnerPlayer2, ProcessType::RunnerPlayer1, ProcessType::Simulator) => {
+                        (process2.output(), process1.output(), process3.output())
+                    },
+                    (ProcessType::RunnerPlayer1, ProcessType::Simulator, ProcessType::RunnerPlayer2) => {
+                        (process1.output(), process3.output(), process2.output())
+                    },
+                    (ProcessType::RunnerPlayer2, ProcessType::Simulator, ProcessType::RunnerPlayer1) => {
+                        (process2.output(), process3.output(), process1.output())
+                    },
+                    (ProcessType::Simulator, ProcessType::RunnerPlayer1, ProcessType::RunnerPlayer2) => {
+                        (process3.output(), process1.output(), process2.output())
+                    },
+                    (ProcessType::Simulator, ProcessType::RunnerPlayer2, ProcessType::RunnerPlayer1) => {
+                        (process3.output(), process2.output(), process1.output())
+                    },
+                    _ => {
+                        return create_error_response(
+                            self.game_id.to_owned(),
+                            SimulatorError::UnidentifiedError("Failed to map outputs".to_owned()),
+                        );
+                    }
                 };
-
+                
                 info!("Successfully executed for game {}", self.game_id);
-                create_final_response(
+                create_final_pvp_response(
                     self.parameters,
                     self.game_id,
-                    player_process_out,
+                    player1_process_out,
+                    player2_process_out,
                     sim_process_out,
                 )
             }

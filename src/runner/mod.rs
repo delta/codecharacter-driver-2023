@@ -1,6 +1,6 @@
 use std::{fs::File, process::Child};
 
-use crate::error::SimulatorError;
+use crate::{error::SimulatorError, request::Language};
 
 pub mod cpp;
 pub mod java;
@@ -10,6 +10,21 @@ pub mod simulator;
 pub enum GameType {
     NormalGame,
     PvPGame,
+}
+
+impl GameType {
+    pub fn file_name(&self, language: Language) -> &str {
+        match self {
+            GameType::PvPGame => match language {
+                Language::CPP | Language::PYTHON => "run",
+                Language::JAVA => "RunPvp",
+            },
+            GameType::NormalGame => match language {
+                Language::CPP | Language::PYTHON => "run",
+                Language::JAVA => "Run",
+            },
+        }
+    }
 }
 
 impl ToString for GameType {
@@ -23,6 +38,4 @@ impl ToString for GameType {
 
 pub trait Runnable {
     fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError>;
-    fn run2(&self, stdin: File, stdout: File, game_type: GameType)
-        -> Result<Child, SimulatorError>;
 }

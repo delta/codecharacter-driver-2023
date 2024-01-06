@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::File,
     os::linux::process::CommandExt,
     process::{Command, Stdio},
@@ -27,47 +26,6 @@ impl Runner {
 
 impl Runnable for Runner {
     fn run(
-        &self,
-        stdin: File,
-        stdout: File,
-        game_type: GameType,
-    ) -> Result<std::process::Child, SimulatorError> {
-        Command::new("docker")
-            .args([
-                "run",
-                &format!("--memory={}", "100m"),
-                &format!("--memory-swap={}", "100m"),
-                "--cpus=1",
-                "--ulimit",
-                &format!("cpu={}:{}", "10", "10"),
-                "--rm",
-                "--name",
-                &format!("{}_python_runner", self.game_id),
-                "-i",
-                "-v",
-                format!(
-                    "{}/{}.py:/player_code/run.py",
-                    self.current_dir.as_str(),
-                    self.file_name.as_str()
-                )
-                .as_str(),
-                "ghcr.io/delta/codecharacter-python-runner:latest",
-                &game_type.to_string(),
-            ])
-            .create_pidfd(true)
-            .current_dir(&self.current_dir)
-            .stdin(stdin)
-            .stdout(stdout)
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|err| {
-                SimulatorError::UnidentifiedError(format!(
-                    "Couldnt spawn the python runner process: {err}"
-                ))
-            })
-    }
-
-    fn run2(
         &self,
         stdin: File,
         stdout: File,

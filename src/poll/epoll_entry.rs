@@ -20,6 +20,8 @@ use super::epoll::Pollable;
 #[derive(Debug)]
 pub enum ProcessType {
     Runner,
+    RunnerPlayer1,
+    RunnerPlayer2,
     Simulator,
 }
 
@@ -56,6 +58,7 @@ impl Process {
     }
 }
 
+#[derive(Debug)]
 pub struct ProcessOutput {
     stderr: ChildStderr,
     output: String,
@@ -89,7 +92,7 @@ impl ProcessOutput {
             |err| SimulatorError::UnidentifiedError(format!("Error during log extraction: {err}"));
 
         match self.process_type {
-            ProcessType::Runner => {
+            ProcessType::Runner | ProcessType::RunnerPlayer1 | ProcessType::RunnerPlayer2 => {
                 let limit: usize = env::var("MAX_LOG_SIZE").unwrap().parse().unwrap();
                 let stderr = &mut self.stderr;
 
