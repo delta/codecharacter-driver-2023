@@ -131,6 +131,7 @@ impl Handler for NormalGameRequest {
 
         let game_dir_handle = game_dir_handle.unwrap();
         let player_dir = "player".to_string();
+        game_dir_handle.create_sub_dir(&player_dir);
 
         if let Some(resp) = copy_files(
             &self.game_id,

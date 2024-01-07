@@ -26,7 +26,7 @@ impl Runner {
 }
 
 impl Runnable for Runner {
-    fn run(&self, stdin: File, stdout: File, _game_type: GameType) -> Result<Child, SimulatorError> {
+    fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([
                 "run",
@@ -92,6 +92,7 @@ impl Runnable for Runner {
                 "-v",
                 format!("{}/{}/run:/player_code", self.current_dir, self.player_dir).as_str(),
                 &env::var("CPP_RUNNER_IMAGE").unwrap(),
+                &game_type.to_string()
             ])
             .current_dir(&self.current_dir)
             .create_pidfd(true)

@@ -16,8 +16,8 @@ impl GameType {
     pub fn file_name(&self, language: Language) -> &str {
         match self {
             GameType::PvPGame => match language {
-                Language::CPP | Language::PYTHON => "run",
-                Language::JAVA => "RunPvp",
+                Language::CPP | Language::PYTHON => "runpvp",
+                Language::JAVA => "RunPvP",
             },
             GameType::NormalGame => match language {
                 Language::CPP | Language::PYTHON => "run",

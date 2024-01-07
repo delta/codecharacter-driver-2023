@@ -6,15 +6,15 @@ JAVA_COMPILER_IMAGE="ghcr.io/delta/codecharacter-java-compiler:latest"
 JAVA_RUNNER_IMAGE="ghcr.io/delta/codecharacter-java-runner:latest"
 PYTHON_RUNNER_IMAGE="ghcr.io/delta/codecharacter-python-runner:latest"
 
-MAX_LOG_SIZE=200000
-COMPILATION_TIME_LIMIT=5
-RUNTIME_TIME_LIMIT=10
-COMPILATION_MEMORY_LIMIT=300m
-RUNTIME_MEMORY_LIMIT=100m
-EPOLL_WAIT_TIMEOUT=30_000
+MAX_LOG_SIZE="200000"
+COMPILATION_TIME_LIMIT="5"
+RUNTIME_TIME_LIMIT="10"
+COMPILATION_MEMORY_LIMIT="300m"
+RUNTIME_MEMORY_LIMIT="100m"
+EPOLL_WAIT_TIMEOUT="30_000"
 MAP_SIZE="64"
 
-RABBIT_MQ_HOST=amqp://guest:guest@localhost
-NORMAL_GAME_REQUEST_QUEUE=gameRequestQueue
-PVP_GAME_REQUEST_QUEUE=gamePvpRequestQueue
-GAME_RESPONSE_QUEUE=gameStatusUpdateQueue
+RABBIT_MQ_HOST="amqp://guest:guest@localhost"
+NORMAL_GAME_REQUEST_QUEUE="gameRequestQueue"
+PVP_GAME_REQUEST_QUEUE="gamePvpRequestQueue"
+GAME_RESPONSE_QUEUE="gameStatusUpdateQueue"

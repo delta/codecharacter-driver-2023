@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     os::linux::process::CommandExt,
-    process::{Child, Command, Stdio},
+    process::{Child, Command, Stdio}, env,
 };
 
 use crate::error::SimulatorError;
@@ -11,15 +11,15 @@ use super::{GameType, Runnable};
 pub struct Runner {
     current_dir: String,
     game_id: String,
-    file_name: String,
+    player_dir: String,
 }
 
 impl Runner {
-    pub fn new(current_dir: String, game_id: String, file_name: String) -> Self {
+    pub fn new(current_dir: String, game_id: String, player_dir: String) -> Self {
         Runner {
             current_dir,
             game_id,
-            file_name,
+            player_dir,
         }
     }
 }
@@ -29,30 +29,29 @@ impl Runnable for Runner {
         let compile = Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", "300m"),
-                &format!("--memory-swap={}", "300m"),
+                &format!("--memory={}", env::var("COMPILATION_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("COMPILATION_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1.5",
                 "--ulimit",
-                &format!("cpu={}:{}", "5", "5"),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("COMPILATION_TIME_LIMIT").unwrap(),
+                    env::var("COMPILATION_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
-                &format!("{}_java_compiler", self.game_id),
+                &format!("{}_{}_java_compiler", self.game_id, self.player_dir.replace("/", "_")),
                 "-v",
                 format!(
-                    "{}/{}.java:/player_code/Run.java",
+                    "{}/{}:/player_code",
                     self.current_dir.as_str(),
-                    self.file_name.as_str(),
+                    self.player_dir.as_str()
                 )
                 .as_str(),
-                "-v",
-                format!(
-                    "{}/{}.jar:/player_code/run.jar",
-                    self.current_dir.as_str(),
-                    self.file_name.as_str()
-                )
-                .as_str(),
-                "ghcr.io/delta/codecharacter-java-compiler:latest",
-                &game_type.to_string(),
+                &env::var("JAVA_COMPILER_IMAGE").unwrap(),
             ])
             .current_dir(&self.current_dir)
             .stdout(Stdio::null())
@@ -78,23 +77,32 @@ impl Runnable for Runner {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}", "100m"),
-                &format!("--memory-swap={}", "100m"),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}", "10", "10"),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
-                &format!("{}_java_runner", self.game_id),
+                &format!("{}_{}_java_runner", self.game_id, self.player_dir.replace("/", "_")),
                 "-i",
                 "-v",
                 format!(
-                    "{}/{}.jar:/run.jar",
+                    "{}/{}/run.jar:/run.jar",
                     self.current_dir.as_str(),
-                    self.file_name.as_str()
+                    self.player_dir.as_str(),
                 )
                 .as_str(),
-                "ghcr.io/delta/codecharacter-java-runner:latest",
+                &env::var("JAVA_RUNNER_IMAGE").unwrap(),
+                "run.jar", //jar file name
+                &game_type.to_string()
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)
