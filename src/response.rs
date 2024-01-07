@@ -64,12 +64,12 @@ mod tests {
     #[test]
     pub fn serialization_test() {
         // An example respone
-        let expected_response = r#"{"game_id":"030af985-f4b5-4914-94d8-e559576449e3","game_status":"EXECUTING","game_result":null}"#;
+        let expected_response = r#"{"game_id":"030af985-f4b5-4914-94d8-e559576449e3","game_status":"EXECUTING","game_result":null,"game_result_player1":null,"game_result_player2":null}"#;
 
         let game_status = GameStatus::new_normal (
             "030af985-f4b5-4914-94d8-e559576449e3".to_string(),
             GameStatusEnum::EXECUTING,
-            None,
+            None
         );
 
         let serialized_game_status = serde_json::to_string(&game_status).unwrap();

@@ -112,11 +112,11 @@ mod tests {
     use crate::request::PlayerCode;
 
     // TODO: Test the pvp desearialization
-    use super::{Attacker, Defender, GameParameters, NormalGameRequest};
+    use super::{Attacker, Defender, GameParameters, NormalGameRequest,PvPGameRequest};
     #[test]
     pub fn deserealization_test() {
-        // An example request that we might get from backend
-        let example_request = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"source_code":"print(x)","language":"PYTHON","map":"[[1,0],[0,2]]"}"#;
+        // An example request that we might get from backend for a normal game
+        let example_request_normal_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"player_code":{"source_code":"print(x)","language":"PYTHON"},"map":"[[1,0],[0,2]]"}"#;
 
         let expected_deserealized_struct = NormalGameRequest {
             game_id: "0fa0f12d-d472-42d5-94b4-011e0c916023".to_owned(),
@@ -169,7 +169,67 @@ mod tests {
             },
         };
         let deserealized_example_request: NormalGameRequest =
-            serde_json::from_str(example_request).unwrap();
+            serde_json::from_str(example_request_normal_game).unwrap();
+        assert_eq!(deserealized_example_request, expected_deserealized_struct);
+
+        // An example request that we might get from backend for a pvp game
+        let example_request_pvp_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"player1":{"source_code":"print(x)","language":"PYTHON"},"player2":{"source_code":"print(x)","language":"PYTHON"}}"#;
+
+        let expected_deserealized_struct = PvPGameRequest {
+            game_id: "0fa0f12d-d472-42d5-94b4-011e0c916023".to_owned(),
+            parameters: GameParameters {
+                attackers: vec![
+                    Attacker {
+                        id: 1,
+                        hp: 10,
+                        range: 3,
+                        attack_power: 3,
+                        speed: 3,
+                        price: 1,
+                        is_aerial: 0,
+                    },
+                    Attacker {
+                        id: 2,
+                        hp: 10,
+                        range: 3,
+                        attack_power: 3,
+                        speed: 3,
+                        price: 1,
+                        is_aerial: 1,
+                    },
+                ],
+                defenders: vec![
+                    Defender {
+                        id: 1,
+                        hp: 10,
+                        range: 4,
+                        attack_power: 5,
+                        price: 1,
+                        is_aerial: 1,
+                    },
+                    Defender {
+                        id: 2,
+                        hp: 10,
+                        range: 6,
+                        attack_power: 5,
+                        price: 1,
+                        is_aerial: 1,
+                    },
+                ],
+                no_of_turns: 500,
+                no_of_coins: 1000,
+            },
+            player1: PlayerCode {
+                language: super::Language::PYTHON,
+                source_code: r#"print(x)"#.to_owned(),
+            },
+            player2: PlayerCode {
+                language: super::Language::PYTHON,
+                source_code: r#"print(x)"#.to_owned(),
+            },
+        };
+        let deserealized_example_request: PvPGameRequest =
+            serde_json::from_str(example_request_pvp_game).unwrap();
         assert_eq!(deserealized_example_request, expected_deserealized_struct);
     }
 }
