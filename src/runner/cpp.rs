@@ -5,8 +5,6 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use log::info;
-
 use crate::error::SimulatorError;
 
 use super::{GameType, Runnable};
@@ -27,34 +25,8 @@ impl Runner {
     }
 }
 
-// impl Runnable for Runner {
-//     fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
-//         info!("Running the C++ runner process");
-
-//         info!("{}", self.player_dir);
-//         info!("{}", self.current_dir);
-
-//         Command::new("/home/shubham/Desktop/Projects/Codecharacter/codecharacter-driver-2023/player_code/cpp/run")
-//             .args([
-//                 &game_type.to_string(),
-//             ])
-//             .current_dir(&self.current_dir)
-//             .create_pidfd(true)
-//             .stdin(stdin)
-//             .stdout(stdout)
-//             .stderr(Stdio::piped())
-//             .spawn()
-//             .map_err(|err| {
-//                 SimulatorError::UnidentifiedError(format!(
-//                     "Couldnt spawn the C++ runner process: {err}"
-//                 ))
-//             })
-//     }
-// }
-
-
 impl Runnable for Runner {
-    fn run(&self, stdin: File, stdout: File, game_type: GameType) -> Result<Child, SimulatorError> {
+    fn run(&self, stdin: File, stdout: File, _game_type: GameType) -> Result<Child, SimulatorError> {
         let compile = Command::new("docker")
             .args([
                 "run",
@@ -98,19 +70,7 @@ impl Runnable for Runner {
             return Err(SimulatorError::CompilationError(stderr));
         }
 
-        info!("Compiled succesfully");
-
-        info!("The dirs are {} {}", self.player_dir, self.current_dir);
-
-        //list files in a directory
-
-        let files = std::fs::read_dir(format!("{}/{}", self.current_dir, self.player_dir)).unwrap();
-        for file in files {
-            println!("Name: {}", file.unwrap().path().display());
-        }
-
-
-        let gg = Command::new("docker")
+        Command::new("docker")
             .args([
                 "run",
                 &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
@@ -143,8 +103,6 @@ impl Runnable for Runner {
                 SimulatorError::UnidentifiedError(format!(
                     "Couldnt spawn the C++ runner process: {err}"
                 ))
-            });
-        info!("Started the C++ runner process");
-        gg
+            })
     }
 }

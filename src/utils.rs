@@ -5,7 +5,6 @@ use std::{
 
 
 use fs_extra::dir::CopyOptions;
-use log::info;
 
 use crate::{
     create_error_response, error,
@@ -18,7 +17,6 @@ pub fn copy_dir_all(
     dst: impl AsRef<std::path::Path>,
 ) -> std::io::Result<()> {
     let opt = CopyOptions::new();
-    info!("Copying dir from {:?} to {:?}", src.as_ref(), dst.as_ref());
     for entry in std::fs::read_dir(src).unwrap() {
         let entry = entry?;
         let ty = entry.file_type()?;

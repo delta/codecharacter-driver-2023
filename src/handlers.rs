@@ -1,4 +1,4 @@
-use std::{env, os::fd::AsRawFd};
+use std::env;
 
 use log::info;
 use nix::sys::epoll::EpollFlags;
@@ -48,10 +48,7 @@ fn handle_event(
                 match entry {
                     EpollEntryType::StdErr(_) => unreachable!(),
                     EpollEntryType::Process(mut p) => {
-                        info!("For process {}", p.get_process().id());
                         let exit_status = p.wait()?;
-                        println!("died: {}", p.get_process().id());
-
                         if exit_status.success() {
                             res.push(None);
                         } else {
@@ -271,6 +268,8 @@ impl Handler for PvPGameRequest {
         game_dir_handle.create_sub_dir(player1_dir);
         game_dir_handle.create_sub_dir(player2_dir);
 
+        //print all files in game_dir_handle
+
         if let Some(resp) = copy_files(
             &self.game_id,
             &self.player1,
@@ -291,24 +290,25 @@ impl Handler for PvPGameRequest {
             return resp;
         }
 
-        info!("Copied files successfully");
-
         let p1_in = format!("{}/p1_in", game_dir_handle.get_path());
         let p2_in = format!("{}/p2_in", game_dir_handle.get_path());
         let p3_in = format!("{}/p3_in", game_dir_handle.get_path());
         let p4_in = format!("{}/p4_in", game_dir_handle.get_path());
         let p5_in = format!("{}/p5_in", game_dir_handle.get_path());
 
-        let pipe1 = Fifo::new(p1_in);
-        let pipe2 = Fifo::new(p2_in);
-        let pipe3 = Fifo::new(p3_in);
-        let pipe4 = Fifo::new(p4_in);
-        let pipe5 = Fifo::new(p5_in);
+        
+
+        let pipe1 = Fifo::new(p1_in.to_owned());
+        let pipe2 = Fifo::new(p2_in.to_owned());
+        let pipe3 = Fifo::new(p3_in.to_owned());
+        let pipe4 = Fifo::new(p4_in.to_owned());
+        let pipe5 = Fifo::new(p5_in.to_owned());
+
 
         match (pipe1, pipe2, pipe3, pipe4, pipe5) {
             (Ok(mut p1), Ok(mut p2), Ok(mut p3), Ok(mut p4), Ok(mut p5)) => {
-                let (sim_p1_r, p1_w) = p1.get_ends().unwrap();
-                let (sim_p2_r, p2_w) = p2.get_ends().unwrap();
+                let (_sim_p1_r, p1_w) = p1.get_ends().unwrap();
+                let (_sim_p2_r, p2_w) = p2.get_ends().unwrap();
                 let (p1_r, sim_p1_w) = p3.get_ends().unwrap();
                 let (p2_r, sim_p2_w) = p4.get_ends().unwrap();
                 let (sim_r, sim_w) = p5.get_ends().unwrap();
@@ -327,29 +327,18 @@ impl Handler for PvPGameRequest {
                     &game_dir_handle,
                     &player2_dir.to_string(),
                 );
-                info!("Got runners");
                 let initialize = || -> Result<_, SimulatorError> {
                     let mut player1_process = runner1.run(p1_r, p1_w, GameType::PvPGame)?;
                     let mut player2_process = runner2.run(p2_r, p2_w, GameType::PvPGame)?;
                     let simulator = simulator::Simulator::new(self.game_id.to_string());
-
                     let mut sim_process = simulator.run_pvp(
                         sim_r,
                         sim_w,
-                        sim_p1_r.as_raw_fd(),
-                        sim_p1_w.as_raw_fd(),
-                        sim_p2_r.as_raw_fd(),
-                        sim_p2_w.as_raw_fd(),
+                        p1_in,
+                        p3_in,
+                        p2_in,
+                        p4_in,
                     )?;
-
-                    println!("player1_process={}", player1_process.id());
-                    println!("player2_process={}", player2_process.id());
-                    println!("sim_process={}", sim_process.id());
-
-                    println!("sim_p1_r={}", sim_p1_r.as_raw_fd());
-                    println!("sim_p1_w={}", sim_p1_w.as_raw_fd());
-                    println!("sim_p2_r={}", sim_p2_r.as_raw_fd());
-                    println!("sim_p2_w={}", sim_p2_w.as_raw_fd());
 
                     let player1_stderr = player1_process.stderr.take().unwrap();
                     let player2_stderr = player2_process.stderr.take().unwrap();
@@ -402,8 +391,6 @@ impl Handler for PvPGameRequest {
                     Err(err) => return create_error_response(self.game_id.to_owned(), err),
                 };
 
-                info!("Crossed first possib");
-
                 let mut outputs: Vec<ProcessOutput> = vec![];
 
                 while !event_handler.is_empty() {
@@ -416,7 +403,6 @@ impl Handler for PvPGameRequest {
                     }
                 }
 
-                info!("Crossed second possib");
 
                 let process1 = outputs.remove(0);
                 let process2 = outputs.remove(0);
