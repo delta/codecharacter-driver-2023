@@ -44,7 +44,11 @@ impl Runnable for Runner {
                 ),
                 "--rm",
                 "--name",
-                &format!("{}_{}_cpp_compiler", self.game_id, self.player_dir.replace("/", "_")),
+                &format!(
+                    "{}_{}_cpp_compiler",
+                    self.game_id,
+                    self.player_dir.replace('/', "_")
+                ),
                 "-v",
                 format!("{}/{}/:/player_code/", self.current_dir, self.player_dir).as_str(),
                 &env::var("CPP_COMPILER_IMAGE").unwrap(),
@@ -87,12 +91,16 @@ impl Runnable for Runner {
                 ),
                 "--rm",
                 "--name",
-                &format!("{}_{}_cpp_runner", self.game_id, self.player_dir.replace("/", "_")),
+                &format!(
+                    "{}_{}_cpp_runner",
+                    self.game_id,
+                    self.player_dir.replace('/', "_")
+                ),
                 "-i",
                 "-v",
                 format!("{}/{}/run:/player_code", self.current_dir, self.player_dir).as_str(),
                 &env::var("CPP_RUNNER_IMAGE").unwrap(),
-                &game_type.to_string()
+                &game_type.to_string(),
             ])
             .current_dir(&self.current_dir)
             .create_pidfd(true)

@@ -28,22 +28,29 @@ impl Simulator {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}",env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}",env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}",env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--name",
                 &format!("{}_simulator", self.game_id),
                 "--rm",
                 "-i",
                 "-v",
-                &format!("/tmp/{}:/tmp/{}",self.game_id,self.game_id),
+                &format!("/tmp/{}:/tmp/{}", self.game_id, self.game_id),
                 &env::var("SIMULATOR_IMAGE").unwrap(),
                 "--type=PvP",
-                &format!("p1_in={p1_r}"), //p1_in
+                &format!("p1_in={p1_r}"),  //p1_in
                 &format!("p1_out={p1_w}"), // p3_in
-                &format!("p2_in={p2_r}"), // p2_in
+                &format!("p2_in={p2_r}"),  // p2_in
                 &format!("p2_out={p2_w}"), // p4_in
             ])
             .create_pidfd(true)
@@ -62,11 +69,18 @@ impl Simulator {
         Command::new("docker")
             .args([
                 "run",
-                &format!("--memory={}",env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
-                &format!("--memory-swap={}",env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!("--memory={}", env::var("RUNTIME_MEMORY_LIMIT").unwrap()),
+                &format!(
+                    "--memory-swap={}",
+                    env::var("RUNTIME_MEMORY_LIMIT").unwrap()
+                ),
                 "--cpus=1",
                 "--ulimit",
-                &format!("cpu={}:{}",env::var("RUNTIME_TIME_LIMIT").unwrap(), env::var("RUNTIME_TIME_LIMIT").unwrap()),
+                &format!(
+                    "cpu={}:{}",
+                    env::var("RUNTIME_TIME_LIMIT").unwrap(),
+                    env::var("RUNTIME_TIME_LIMIT").unwrap()
+                ),
                 "--rm",
                 "--name",
                 &format!("{}_simulator", self.game_id),

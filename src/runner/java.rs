@@ -1,7 +1,8 @@
 use std::{
+    env,
     fs::File,
     os::linux::process::CommandExt,
-    process::{Child, Command, Stdio}, env,
+    process::{Child, Command, Stdio},
 };
 
 use crate::error::SimulatorError;
@@ -43,7 +44,11 @@ impl Runnable for Runner {
                 ),
                 "--rm",
                 "--name",
-                &format!("{}_{}_java_compiler", self.game_id, self.player_dir.replace("/", "_")),
+                &format!(
+                    "{}_{}_java_compiler",
+                    self.game_id,
+                    self.player_dir.replace('/', "_")
+                ),
                 "-v",
                 format!(
                     "{}/{}:/player_code",
@@ -91,7 +96,11 @@ impl Runnable for Runner {
                 ),
                 "--rm",
                 "--name",
-                &format!("{}_{}_java_runner", self.game_id, self.player_dir.replace("/", "_")),
+                &format!(
+                    "{}_{}_java_runner",
+                    self.game_id,
+                    self.player_dir.replace('/', "_")
+                ),
                 "-i",
                 "-v",
                 format!(
@@ -102,7 +111,7 @@ impl Runnable for Runner {
                 .as_str(),
                 &env::var("JAVA_RUNNER_IMAGE").unwrap(),
                 "run.jar", //jar file name
-                &game_type.to_string()
+                &game_type.to_string(),
             ])
             .create_pidfd(true)
             .current_dir(&self.current_dir)

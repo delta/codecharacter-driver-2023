@@ -85,18 +85,17 @@ pub fn create_final_pvp_response(
             player2_final_logs.push('\n');
         }
 
-
         if ln.starts_with("TURN") {
             if let Some(num) = ln
                 .strip_prefix("TURN, ")
                 .and_then(|x| x.parse::<usize>().ok())
             {
-                if current_player_logs ==1 && player_1_turnwise_logs.contains_key(&num) {
+                if current_player_logs == 1 && player_1_turnwise_logs.contains_key(&num) {
                     for log in player_1_turnwise_logs.get(&num).unwrap().iter() {
                         player1_final_logs.push_str(&format!("PRINT, {log}\n"));
                     }
                 }
-                if current_player_logs==2 && player_2_turnwise_logs.contains_key(&num) {
+                if current_player_logs == 2 && player_2_turnwise_logs.contains_key(&num) {
                     for log in player_2_turnwise_logs.get(&num).unwrap().iter() {
                         player2_final_logs.push_str(&format!("PRINT, {log}\n"));
                     }
@@ -135,22 +134,22 @@ pub fn create_final_pvp_response(
         }
     }
 
-    response::GameStatus::new_pvp (
+    response::GameStatus::new_pvp(
         game_id,
         GameStatusEnum::EXECUTED,
-            Some(GameResult {
-                destruction_percentage: player1_destruction_percentage,
-                coins_used: (parameters.no_of_coins - player1_coins_left) as u64,
-                has_errors: false,
-                log: player1_final_logs,
-            }),
-            Some(GameResult {
-                destruction_percentage: player2_destruction_percentage,
-                coins_used: (parameters.no_of_coins - player2_coins_left) as u64,
-                has_errors: false,
-                log: player2_final_logs,
-            })
-        )
+        Some(GameResult {
+            destruction_percentage: player1_destruction_percentage,
+            coins_used: (parameters.no_of_coins - player1_coins_left) as u64,
+            has_errors: false,
+            log: player1_final_logs,
+        }),
+        Some(GameResult {
+            destruction_percentage: player2_destruction_percentage,
+            coins_used: (parameters.no_of_coins - player2_coins_left) as u64,
+            has_errors: false,
+            log: player2_final_logs,
+        }),
+    )
 }
 
 pub fn create_final_response(
@@ -207,7 +206,7 @@ pub fn create_final_response(
         }
     }
 
-    response::GameStatus::new_normal (
+    response::GameStatus::new_normal(
         game_id,
         GameStatusEnum::EXECUTED,
         Some(GameResult {
@@ -215,16 +214,12 @@ pub fn create_final_response(
             coins_used: (parameters.no_of_coins - coins_left) as u64,
             has_errors: false,
             log: final_logs,
-        }))
+        }),
+    )
 }
 
-
 pub fn create_executing_response(game_id: &String) -> response::GameStatus {
-    response::GameStatus::new_normal (
-        game_id.to_owned(),
-        GameStatusEnum::EXECUTING,
-        None
-    )
+    response::GameStatus::new_normal(game_id.to_owned(), GameStatusEnum::EXECUTING, None)
 }
 
 pub fn create_error_response(game_id: String, err: SimulatorError) -> response::GameStatus {
@@ -255,9 +250,9 @@ pub fn create_error_response(game_id: String, err: SimulatorError) -> response::
             coins_used: 0,
             has_errors: true,
             log: format!("ERRORS, ERROR TYPE: {err_type}\nERRORS, ERROR LOG:\n{error}\n"),
-        }))
-    }
-
+        }),
+    )
+}
 
 #[cfg(test)]
 mod tests {

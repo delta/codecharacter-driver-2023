@@ -112,7 +112,7 @@ mod tests {
     use crate::request::PlayerCode;
 
     // TODO: Test the pvp desearialization
-    use super::{Attacker, Defender, GameParameters, NormalGameRequest,PvPGameRequest};
+    use super::{Attacker, Defender, GameParameters, NormalGameRequest, PvPGameRequest};
     #[test]
     pub fn deserealization_test() {
         // An example request that we might get from backend for a normal game

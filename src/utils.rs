@@ -1,15 +1,17 @@
 use std::{
+    env,
     fs::File,
     io::{BufWriter, Write},
 };
-
 
 use fs_extra::dir::CopyOptions;
 
 use crate::{
     create_error_response, error,
-    request::{GameParameters, NormalGameRequest, PlayerCode, PvPGameRequest, Language},
-    response::{self, GameStatus}, game_dir::GameDir, runner::GameType,
+    game_dir::GameDir,
+    request::{GameParameters, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
+    response::{self, GameStatus},
+    runner::GameType,
 };
 
 pub fn copy_dir_all(
@@ -36,7 +38,13 @@ pub fn send_initial_parameters<'a>(
     game_parameters: &'a GameParameters,
 ) -> BufWriter<&'a File> {
     writer
-        .write_all(format!("{} {}\n", "5", "1000").as_bytes())
+        .write_all(
+            format!(
+                "{} {}\n",
+                game_parameters.no_of_turns, game_parameters.no_of_coins
+            )
+            .as_bytes(),
+        )
         .unwrap();
     writer
         .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
@@ -51,7 +59,7 @@ pub fn send_initial_parameters<'a>(
                     attacker.attack_power,
                     attacker.speed,
                     attacker.price,
-                    "0",
+                    attacker.is_aerial,
                 )
                 .as_bytes(),
             )
@@ -68,9 +76,9 @@ pub fn send_initial_parameters<'a>(
                     defender.hp,
                     defender.range,
                     defender.attack_power,
-                    0,
+                    "0",
                     defender.price,
-                    0
+                    defender.is_aerial
                 )
                 .as_bytes(),
             )
@@ -92,7 +100,16 @@ pub fn send_initial_input(fifos: Vec<&File>, normal_game_request: &NormalGameReq
         let writer = BufWriter::new(fifo);
         let mut writer = send_initial_parameters(writer, &normal_game_request.parameters);
 
-        writer.write_all("64 64\n".as_bytes()).unwrap();
+        writer
+            .write_all(
+                format!(
+                    "{}{}\n",
+                    env::var("MAP_SIZE").unwrap(),
+                    env::var("MAP_SIZE").unwrap()
+                )
+                .as_bytes(),
+            )
+            .unwrap();
 
         for row in normal_game_request.map.iter() {
             for cell in row.iter() {

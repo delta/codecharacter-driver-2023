@@ -4,7 +4,7 @@ use log::info;
 use nix::sys::epoll::EpollFlags;
 
 use crate::{
-    create_error_response, create_final_response,
+    create_error_response, create_final_pvp_response, create_final_response,
     error::SimulatorError,
     fifo::Fifo,
     game_dir::GameDir,
@@ -15,7 +15,7 @@ use crate::{
     request::{GameRequest, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
     response::GameStatus,
     runner::{cpp, java, py, simulator, GameType, Runnable},
-    utils::{copy_files, send_initial_input, send_initial_pvp_input}, create_final_pvp_response,
+    utils::{copy_files, send_initial_input, send_initial_pvp_input},
 };
 
 pub trait Handler {
@@ -30,7 +30,8 @@ fn handle_event(
             .unwrap()
             .parse()
             .unwrap_or(1000),
-        epoll_handle.get_registered_fds().len())?;
+        epoll_handle.get_registered_fds().len(),
+    )?;
     let mut res = vec![];
     for e in events {
         match epoll_handle.process_event(e)? {
@@ -222,7 +223,7 @@ impl Handler for NormalGameRequest {
                 let process2 = outputs.remove(0);
 
                 let (player_process_out, sim_process_out) = match process1.process_type() {
-                    ProcessType::Runner  => (process1.output(), process2.output()),
+                    ProcessType::Runner => (process1.output(), process2.output()),
                     ProcessType::Simulator => (process2.output(), process1.output()),
                     _ => {
                         return create_error_response(
@@ -253,7 +254,6 @@ impl Handler for PvPGameRequest {
             self.game_id, self.player1.language, self.player2.language
         );
         let game_dir_handle = GameDir::new(&self.game_id);
-
 
         if game_dir_handle.is_none() {
             return create_error_response(
@@ -297,14 +297,11 @@ impl Handler for PvPGameRequest {
         let p4_in = format!("{}/p4_in", game_dir_handle.get_path());
         let p5_in = format!("{}/p5_in", game_dir_handle.get_path());
 
-        
-
         let pipe1 = Fifo::new(p1_in.to_owned());
         let pipe2 = Fifo::new(p2_in.to_owned());
         let pipe3 = Fifo::new(p3_in.to_owned());
         let pipe4 = Fifo::new(p4_in.to_owned());
         let pipe5 = Fifo::new(p5_in.to_owned());
-
 
         match (pipe1, pipe2, pipe3, pipe4, pipe5) {
             (Ok(mut p1), Ok(mut p2), Ok(mut p3), Ok(mut p4), Ok(mut p5)) => {
@@ -332,14 +329,8 @@ impl Handler for PvPGameRequest {
                     let mut player1_process = runner1.run(p1_r, p1_w, GameType::PvPGame)?;
                     let mut player2_process = runner2.run(p2_r, p2_w, GameType::PvPGame)?;
                     let simulator = simulator::Simulator::new(self.game_id.to_string());
-                    let mut sim_process = simulator.run_pvp(
-                        sim_r,
-                        sim_w,
-                        p1_in,
-                        p3_in,
-                        p2_in,
-                        p4_in,
-                    )?;
+                    let mut sim_process =
+                        simulator.run_pvp(sim_r, sim_w, p1_in, p3_in, p2_in, p4_in)?;
 
                     let player1_stderr = player1_process.stderr.take().unwrap();
                     let player2_stderr = player2_process.stderr.take().unwrap();
@@ -350,8 +341,10 @@ impl Handler for PvPGameRequest {
                     let player2_process = Process::new(player2_process, ProcessType::RunnerPlayer2);
                     let sim_process = Process::new(sim_process, ProcessType::Simulator);
 
-                    let player1_output = ProcessOutput::new(player1_stderr, ProcessType::RunnerPlayer1);
-                    let player2_output = ProcessOutput::new(player2_stderr, ProcessType::RunnerPlayer2);
+                    let player1_output =
+                        ProcessOutput::new(player1_stderr, ProcessType::RunnerPlayer1);
+                    let player2_output =
+                        ProcessOutput::new(player2_stderr, ProcessType::RunnerPlayer2);
                     let sim_output = ProcessOutput::new(sim_stderr, ProcessType::Simulator);
 
                     let player1 = EpollEntryType::Process(player1_process);
@@ -404,30 +397,45 @@ impl Handler for PvPGameRequest {
                     }
                 }
 
-
                 let process1 = outputs.remove(0);
                 let process2 = outputs.remove(0);
                 let process3 = outputs.remove(0);
 
-                let (player1_process_out, player2_process_out, sim_process_out) = match (process1.process_type(), process2.process_type(), process3.process_type()) {
-                    (ProcessType::RunnerPlayer1, ProcessType::RunnerPlayer2, ProcessType::Simulator) => {
-                        (process1.output(), process2.output(), process3.output())
-                    },
-                    (ProcessType::RunnerPlayer2, ProcessType::RunnerPlayer1, ProcessType::Simulator) => {
-                        (process2.output(), process1.output(), process3.output())
-                    },
-                    (ProcessType::RunnerPlayer1, ProcessType::Simulator, ProcessType::RunnerPlayer2) => {
-                        (process1.output(), process3.output(), process2.output())
-                    },
-                    (ProcessType::RunnerPlayer2, ProcessType::Simulator, ProcessType::RunnerPlayer1) => {
-                        (process2.output(), process3.output(), process1.output())
-                    },
-                    (ProcessType::Simulator, ProcessType::RunnerPlayer1, ProcessType::RunnerPlayer2) => {
-                        (process3.output(), process1.output(), process2.output())
-                    },
-                    (ProcessType::Simulator, ProcessType::RunnerPlayer2, ProcessType::RunnerPlayer1) => {
-                        (process3.output(), process2.output(), process1.output())
-                    },
+                let (player1_process_out, player2_process_out, sim_process_out) = match (
+                    process1.process_type(),
+                    process2.process_type(),
+                    process3.process_type(),
+                ) {
+                    (
+                        ProcessType::RunnerPlayer1,
+                        ProcessType::RunnerPlayer2,
+                        ProcessType::Simulator,
+                    ) => (process1.output(), process2.output(), process3.output()),
+                    (
+                        ProcessType::RunnerPlayer2,
+                        ProcessType::RunnerPlayer1,
+                        ProcessType::Simulator,
+                    ) => (process2.output(), process1.output(), process3.output()),
+                    (
+                        ProcessType::RunnerPlayer1,
+                        ProcessType::Simulator,
+                        ProcessType::RunnerPlayer2,
+                    ) => (process1.output(), process3.output(), process2.output()),
+                    (
+                        ProcessType::RunnerPlayer2,
+                        ProcessType::Simulator,
+                        ProcessType::RunnerPlayer1,
+                    ) => (process2.output(), process3.output(), process1.output()),
+                    (
+                        ProcessType::Simulator,
+                        ProcessType::RunnerPlayer1,
+                        ProcessType::RunnerPlayer2,
+                    ) => (process3.output(), process1.output(), process2.output()),
+                    (
+                        ProcessType::Simulator,
+                        ProcessType::RunnerPlayer2,
+                        ProcessType::RunnerPlayer1,
+                    ) => (process3.output(), process2.output(), process1.output()),
                     _ => {
                         return create_error_response(
                             self.game_id.to_owned(),
@@ -435,7 +443,7 @@ impl Handler for PvPGameRequest {
                         );
                     }
                 };
-                
+
                 info!("Successfully executed for game {}", self.game_id);
                 create_final_pvp_response(
                     self.parameters,
