@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use error::SimulatorError;
 use log::error;
-use response::{GameResult, GameStatusEnum};
+use response::{GameResult, GameStatusEnum, GameResultPvP};
 pub mod error;
 pub mod fifo;
 pub mod game_dir;
@@ -51,7 +51,6 @@ fn get_turnwise_logs(player_log: String) -> HashMap<usize, Vec<String>> {
 }
 
 pub fn create_final_pvp_response(
-    parameters: request::GameParameters,
     game_id: String,
     player1_log: String,
     player2_log: String,
@@ -59,13 +58,11 @@ pub fn create_final_pvp_response(
 ) -> response::GameStatus {
     let mut player1_final_logs = String::new();
     let mut player2_final_logs = String::new();
-    let mut player1_coins_left = parameters.no_of_coins;
-    let mut player2_coins_left = parameters.no_of_coins;
-    let mut player1_destruction_percentage = 0.0;
-    let mut player2_destruction_percentage = 0.0;
 
     let player_1_turnwise_logs = get_turnwise_logs(player1_log);
     let player_2_turnwise_logs = get_turnwise_logs(player2_log);
+    let mut player1_score = 0;
+    let mut player2_score = 0;
 
     let mut current_player_logs = 1;
 
@@ -104,48 +101,33 @@ pub fn create_final_pvp_response(
             continue;
         }
 
-        if ln.starts_with("DESTRUCTION") {
+        if ln.starts_with("SCORE") {
             if let Some(x) = ln
-                .strip_prefix("DESTRUCTION, ")
-                .and_then(|s| s.strip_suffix('%'))
-                .and_then(|x| x.parse::<f64>().ok())
+                .strip_prefix("SCORE, ")
+                .and_then(|x| x.parse::<u64>().ok())
             {
                 if current_player_logs == 1 {
-                    player1_destruction_percentage = x;
+                    player1_score = x;
                 } else {
-                    player2_destruction_percentage = x;
+                    player2_score = x;
                 }
             }
-
             continue;
         }
-
-        if ln.starts_with("COINS") {
-            if let Some(x) = ln
-                .strip_prefix("COINS, ")
-                .and_then(|x| x.parse::<usize>().ok())
-            {
-                if current_player_logs == 1 {
-                    player1_coins_left = x as u32;
-                } else {
-                    player2_coins_left = x as u32;
-                }
-            }
-        }
     }
+
+    println!("{}", player1_final_logs);
 
     response::GameStatus::new_pvp(
         game_id,
         GameStatusEnum::EXECUTED,
-        Some(GameResult {
-            destruction_percentage: player1_destruction_percentage,
-            coins_used: (parameters.no_of_coins - player1_coins_left) as u64,
+        Some(GameResultPvP {
+            score: player1_score,
             has_errors: false,
             log: player1_final_logs,
         }),
-        Some(GameResult {
-            destruction_percentage: player2_destruction_percentage,
-            coins_used: (parameters.no_of_coins - player2_coins_left) as u64,
+        Some(GameResultPvP {
+            score: player2_score,
             has_errors: false,
             log: player2_final_logs,
         }),
@@ -205,6 +187,8 @@ pub fn create_final_response(
             }
         }
     }
+
+    println!("{}", final_logs);
 
     response::GameStatus::new_normal(
         game_id,

@@ -446,7 +446,6 @@ impl Handler for PvPGameRequest {
 
                 info!("Successfully executed for game {}", self.game_id);
                 create_final_pvp_response(
-                    self.parameters,
                     self.game_id,
                     player1_process_out,
                     player2_process_out,

@@ -18,12 +18,19 @@ pub struct GameResult {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
+pub struct GameResultPvP {
+    pub score: u64,
+    pub has_errors: bool,
+    pub log: String,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
 pub struct GameStatus {
     pub game_id: String,
     pub game_status: GameStatusEnum,
     pub game_result: Option<GameResult>,
-    pub game_result_player1: Option<GameResult>,
-    pub game_result_player2: Option<GameResult>,
+    pub game_result_player1: Option<GameResultPvP>,
+    pub game_result_player2: Option<GameResultPvP>,
 }
 
 impl GameStatus {
@@ -44,8 +51,8 @@ impl GameStatus {
     pub fn new_pvp(
         game_id: String,
         game_status: GameStatusEnum,
-        game_result_player1: Option<GameResult>,
-        game_result_player2: Option<GameResult>,
+        game_result_player1: Option<GameResultPvP>,
+        game_result_player2: Option<GameResultPvP>,
     ) -> Self {
         GameStatus {
             game_id,

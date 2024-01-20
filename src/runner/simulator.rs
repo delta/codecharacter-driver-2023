@@ -42,7 +42,6 @@ impl Simulator {
                 ),
                 "--name",
                 &format!("{}_simulator", self.game_id),
-                "--rm",
                 "-i",
                 "-v",
                 &format!("/tmp/{}:/tmp/{}", self.game_id, self.game_id),

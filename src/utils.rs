@@ -9,7 +9,7 @@ use fs_extra::dir::CopyOptions;
 use crate::{
     create_error_response, error,
     game_dir::GameDir,
-    request::{GameParameters, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
+    request::{Language, NormalGameRequest, PlayerCode, PvPGameRequest, Attacker, Defender},
     response::{self, GameStatus},
     runner::GameType,
 };
@@ -33,42 +33,35 @@ pub fn copy_dir_all(
     Ok(())
 }
 
-pub fn send_initial_parameters<'a>(
+pub fn send_troops<'a>(
     mut writer: BufWriter<&'a File>,
-    game_parameters: &'a GameParameters,
+    attackers : &Vec<Attacker>,
+    defenders : &Vec<Defender>,
 ) -> BufWriter<&'a File> {
     writer
-        .write_all(
-            format!(
-                "{} {}\n",
-                game_parameters.no_of_turns, game_parameters.no_of_coins
-            )
-            .as_bytes(),
-        )
+        .write_all(format!("{}\n", attackers.len()).as_bytes())
         .unwrap();
-    writer
-        .write_all(format!("{}\n", game_parameters.attackers.len()).as_bytes())
-        .unwrap();
-    for attacker in &game_parameters.attackers {
+    for attacker in attackers {
         writer
             .write_all(
                 format!(
-                    "{} {} {} {} {} {}\n",
+                    "{} {} {} {} {} {} {}\n",
                     attacker.hp,
                     attacker.range,
                     attacker.attack_power,
                     attacker.speed,
                     attacker.price,
                     attacker.is_aerial,
+                    attacker.weight
                 )
                 .as_bytes(),
             )
             .unwrap();
     }
     writer
-        .write_all(format!("{}\n", game_parameters.defenders.len()).as_bytes())
+        .write_all(format!("{}\n", defenders.len()).as_bytes())
         .unwrap();
-    for defender in &game_parameters.defenders {
+    for defender in defenders {
         writer
             .write_all(
                 format!(
@@ -76,7 +69,7 @@ pub fn send_initial_parameters<'a>(
                     defender.hp,
                     defender.range,
                     defender.attack_power,
-                    "0",
+                    0,
                     defender.price,
                     defender.is_aerial
                 )
@@ -90,20 +83,37 @@ pub fn send_initial_parameters<'a>(
 
 pub fn send_initial_pvp_input(fifos: Vec<&File>, pvp_request: &PvPGameRequest) {
     for fifo in fifos {
-        let writer = BufWriter::new(fifo);
-        let _ = send_initial_parameters(writer, &pvp_request.parameters);
+        let mut writer = BufWriter::new(fifo);
+        writer
+        .write_all(
+            format!(
+                "{} {}\n",
+                pvp_request.parameters.no_of_turns, pvp_request.parameters.coins_per_turn
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let _ = send_troops(writer, &pvp_request.parameters.attackers, &pvp_request.parameters.defenders);
     }
 }
 
 pub fn send_initial_input(fifos: Vec<&File>, normal_game_request: &NormalGameRequest) {
     for fifo in fifos {
-        let writer = BufWriter::new(fifo);
-        let mut writer = send_initial_parameters(writer, &normal_game_request.parameters);
-
+        let mut writer = BufWriter::new(fifo);
+        writer
+        .write_all(
+            format!(
+                "{} {}\n",
+                normal_game_request.parameters.no_of_turns, normal_game_request.parameters.no_of_coins
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let mut writer = send_troops(writer, &normal_game_request.parameters.attackers, &normal_game_request.parameters.defenders);
         writer
             .write_all(
                 format!(
-                    "{}{}\n",
+                    "{} {}\n",
                     env::var("MAP_SIZE").unwrap(),
                     env::var("MAP_SIZE").unwrap()
                 )
