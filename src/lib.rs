@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use error::SimulatorError;
 use log::error;
-use response::{GameResult, GameStatusEnum, GameResultPvP};
+use response::{GameResult, GameResultPvP, GameStatusEnum};
 pub mod error;
 pub mod fifo;
 pub mod game_dir;

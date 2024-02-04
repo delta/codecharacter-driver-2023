@@ -9,7 +9,7 @@ use fs_extra::dir::CopyOptions;
 use crate::{
     create_error_response, error,
     game_dir::GameDir,
-    request::{Language, NormalGameRequest, PlayerCode, PvPGameRequest, Attacker, Defender},
+    request::{Attacker, Defender, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
     response::{self, GameStatus},
     runner::GameType,
 };
@@ -35,8 +35,8 @@ pub fn copy_dir_all(
 
 pub fn send_troops<'a>(
     mut writer: BufWriter<&'a File>,
-    attackers : &Vec<Attacker>,
-    defenders : &Vec<Defender>,
+    attackers: &Vec<Attacker>,
+    defenders: &Vec<Defender>,
 ) -> BufWriter<&'a File> {
     writer
         .write_all(format!("{}\n", attackers.len()).as_bytes())
@@ -85,15 +85,19 @@ pub fn send_initial_pvp_input(fifos: Vec<&File>, pvp_request: &PvPGameRequest) {
     for fifo in fifos {
         let mut writer = BufWriter::new(fifo);
         writer
-        .write_all(
-            format!(
-                "{} {}\n",
-                pvp_request.parameters.no_of_turns, pvp_request.parameters.coins_per_turn
+            .write_all(
+                format!(
+                    "{} {}\n",
+                    pvp_request.parameters.no_of_turns, pvp_request.parameters.no_of_coins
+                )
+                .as_bytes(),
             )
-            .as_bytes(),
-        )
-        .unwrap();
-        let _ = send_troops(writer, &pvp_request.parameters.attackers, &pvp_request.parameters.defenders);
+            .unwrap();
+        let _ = send_troops(
+            writer,
+            &pvp_request.parameters.attackers,
+            &pvp_request.parameters.defenders,
+        );
     }
 }
 
@@ -101,15 +105,20 @@ pub fn send_initial_input(fifos: Vec<&File>, normal_game_request: &NormalGameReq
     for fifo in fifos {
         let mut writer = BufWriter::new(fifo);
         writer
-        .write_all(
-            format!(
-                "{} {}\n",
-                normal_game_request.parameters.no_of_turns, normal_game_request.parameters.no_of_coins
+            .write_all(
+                format!(
+                    "{} {}\n",
+                    normal_game_request.parameters.no_of_turns,
+                    normal_game_request.parameters.no_of_coins
+                )
+                .as_bytes(),
             )
-            .as_bytes(),
-        )
-        .unwrap();
-        let mut writer = send_troops(writer, &normal_game_request.parameters.attackers, &normal_game_request.parameters.defenders);
+            .unwrap();
+        let mut writer = send_troops(
+            writer,
+            &normal_game_request.parameters.attackers,
+            &normal_game_request.parameters.defenders,
+        );
         writer
             .write_all(
                 format!(
