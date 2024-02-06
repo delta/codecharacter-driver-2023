@@ -56,6 +56,7 @@ pub fn create_final_pvp_response(
     player2_log: String,
     simulator_log: String,
 ) -> response::GameStatus {
+
     let mut player1_final_logs = String::new();
     let mut player2_final_logs = String::new();
 
@@ -115,8 +116,6 @@ pub fn create_final_pvp_response(
             continue;
         }
     }
-
-    println!("{}", player1_final_logs);
 
     response::GameStatus::new_pvp(
         game_id,
@@ -187,8 +186,6 @@ pub fn create_final_response(
             }
         }
     }
-
-    println!("{}", final_logs);
 
     response::GameStatus::new_normal(
         game_id,

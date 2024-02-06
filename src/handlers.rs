@@ -425,12 +425,12 @@ impl Handler for PvPGameRequest {
                         ProcessType::RunnerPlayer2,
                         ProcessType::Simulator,
                         ProcessType::RunnerPlayer1,
-                    ) => (process2.output(), process3.output(), process1.output()),
+                    ) => (process3.output(), process1.output(), process2.output()),
                     (
                         ProcessType::Simulator,
                         ProcessType::RunnerPlayer1,
                         ProcessType::RunnerPlayer2,
-                    ) => (process3.output(), process1.output(), process2.output()),
+                    ) => (process2.output(), process3.output(), process1.output()),
                     (
                         ProcessType::Simulator,
                         ProcessType::RunnerPlayer2,
