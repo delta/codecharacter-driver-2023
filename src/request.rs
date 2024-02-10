@@ -14,6 +14,8 @@ pub struct Attacker {
     pub price: u32,
     pub is_aerial: u32,
     pub weight: u32,
+    pub num_ability_turns: u32,
+    pub ability_activation_cost: u32,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -126,7 +128,7 @@ mod tests {
     #[test]
     pub fn deserealization_test() {
         // An example request that we might get from backend for a normal game
-        let example_request_normal_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0,"weight":1},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1,"weight":2}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"player_code":{"source_code":"print(x)","language":"PYTHON"},"map":"[[1,0],[0,2]]"}"#;
+        let example_request_normal_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0,"weight":1,"num_ability_turns":2,"ability_activation_cost":2},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1,"weight":2,"num_ability_turns":2,"ability_activation_cost":3}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":1000},"player_code":{"source_code":"print(x)","language":"PYTHON"},"map":"[[1,0],[0,2]]"}"#;
 
         let expected_deserealized_struct = NormalGameRequest {
             game_id: "0fa0f12d-d472-42d5-94b4-011e0c916023".to_owned(),
@@ -141,6 +143,8 @@ mod tests {
                         price: 1,
                         is_aerial: 0,
                         weight: 1,
+                        num_ability_turns: 2,
+                        ability_activation_cost: 2,
                     },
                     Attacker {
                         id: 2,
@@ -151,6 +155,8 @@ mod tests {
                         price: 1,
                         is_aerial: 1,
                         weight: 2,
+                        num_ability_turns: 2,
+                        ability_activation_cost: 3,
                     },
                 ],
                 defenders: vec![
@@ -185,7 +191,7 @@ mod tests {
         assert_eq!(deserealized_example_request, expected_deserealized_struct);
 
         // An example request that we might get from backend for a pvp game
-        let example_request_pvp_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0,"weight":1},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1,"weight":2}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":10},"player1":{"source_code":"print(x)","language":"PYTHON"},"player2":{"source_code":"print(x)","language":"PYTHON"}}"#;
+        let example_request_pvp_game = r#"{"game_id":"0fa0f12d-d472-42d5-94b4-011e0c916023","parameters":{"attackers":[{"id":1,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":0,"weight":1,"num_ability_turns":2,"ability_activation_cost":2},{"id":2,"hp":10,"range":3,"attack_power":3,"speed":3,"price":1,"is_aerial":1,"weight":2,"num_ability_turns":2,"ability_activation_cost":3}],"defenders":[{"id":1,"hp":10,"range":4,"attack_power":5,"price":1,"is_aerial":1},{"id":2,"hp":10,"range":6,"attack_power":5,"price":1,"is_aerial":1}],"no_of_turns":500,"no_of_coins":10},"player1":{"source_code":"print(x)","language":"PYTHON"},"player2":{"source_code":"print(x)","language":"PYTHON"}}"#;
 
         let expected_deserealized_struct = PvPGameRequest {
             game_id: "0fa0f12d-d472-42d5-94b4-011e0c916023".to_owned(),
@@ -200,6 +206,8 @@ mod tests {
                         price: 1,
                         is_aerial: 0,
                         weight: 1,
+                        num_ability_turns: 2,
+                        ability_activation_cost: 2,
                     },
                     Attacker {
                         id: 2,
@@ -210,6 +218,8 @@ mod tests {
                         price: 1,
                         is_aerial: 1,
                         weight: 2,
+                        num_ability_turns: 2,
+                        ability_activation_cost: 3,
                     },
                 ],
                 defenders: vec![

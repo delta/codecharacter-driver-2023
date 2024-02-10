@@ -45,14 +45,16 @@ pub fn send_troops<'a>(
         writer
             .write_all(
                 format!(
-                    "{} {} {} {} {} {} {}\n",
+                    "{} {} {} {} {} {} {} {} {}\n",
                     attacker.hp,
                     attacker.range,
                     attacker.attack_power,
                     attacker.speed,
                     attacker.price,
                     attacker.is_aerial,
-                    attacker.weight
+                    attacker.weight,
+                    attacker.num_ability_turns,
+                    attacker.ability_activation_cost
                 )
                 .as_bytes(),
             )
@@ -156,7 +158,7 @@ pub fn make_copy(
     }
 
     if let Err(e) = std::fs::File::create(player_code_file).and_then(|mut file| {
-        file.write_all(player_code.source_code.as_bytes())
+                file.write_all(player_code.source_code.as_bytes())
             .and_then(|_| file.sync_all())
     }) {
         return Some(create_error_response(
