@@ -7,7 +7,8 @@ use std::{
 use fs_extra::dir::CopyOptions;
 
 use crate::{
-    create_error_response, error,
+    create_normal_error_response, error,
+    create_pvp_error_response,
     game_dir::GameDir,
     request::{Attacker, Defender, Language, NormalGameRequest, PlayerCode, PvPGameRequest},
     response::{self, GameStatus},
@@ -147,24 +148,53 @@ pub fn make_copy(
     player_code_file: &str,
     game_id: &String,
     player_code: &PlayerCode,
+    game_type: &GameType,
 ) -> Option<response::GameStatus> {
     if let Err(e) = copy_dir_all(src_dir, dest_dir) {
-        return Some(create_error_response(
-            game_id.clone(),
-            error::SimulatorError::UnidentifiedError(format!(
-                "Failed to copy player code boilerplate: {e}"
-            )),
-        ));
+        match game_type {
+            GameType::NormalGame => {return Some(create_normal_error_response(
+                game_id.clone(),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code boilerplate: {e}"
+                )),
+            ));}
+            GameType::PvPGame => {return Some(create_pvp_error_response(
+                game_id.clone(),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code boilerplate: {e}"
+                )),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code boilerplate: {e}"
+                )),
+                true,
+                true,
+            ));}
+        }
     }
 
     if let Err(e) = std::fs::File::create(player_code_file).and_then(|mut file| {
                 file.write_all(player_code.source_code.as_bytes())
             .and_then(|_| file.sync_all())
     }) {
-        return Some(create_error_response(
-            game_id.to_owned(),
-            error::SimulatorError::UnidentifiedError(format!("Failed to copy player code: {e}")),
-        ));
+        match game_type {
+            GameType::NormalGame => {return Some(create_normal_error_response(
+                game_id.clone(),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code : {e}"
+                )),
+            ));}
+            GameType::PvPGame => {return Some(create_pvp_error_response(
+                game_id.clone(),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code : {e}"
+                )),
+                error::SimulatorError::UnidentifiedError(format!(
+                    "Failed to copy player code : {e}"
+                )),
+                true,
+                true,
+            ));}
+        }
     }
     None
 }
@@ -212,5 +242,6 @@ pub fn copy_files(
         &player_code_file,
         game_id,
         player_code,
+        game_type,
     )
 }

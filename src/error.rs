@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum SimulatorError {
     CompilationError(String),
     RuntimeError(String),
@@ -7,6 +7,8 @@ pub enum SimulatorError {
     EpollError(String),
     TimeOutError(String),
     RabbitMqError(String),
+    Player1Error(String),
+    Player2Error(String),
 }
 
 #[derive(Debug)]

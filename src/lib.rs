@@ -56,7 +56,6 @@ pub fn create_final_pvp_response(
     player2_log: String,
     simulator_log: String,
 ) -> response::GameStatus {
-
     let mut player1_final_logs = String::new();
     let mut player2_final_logs = String::new();
 
@@ -199,11 +198,74 @@ pub fn create_final_response(
     )
 }
 
+pub fn create_pvp_error_response(
+    game_id: String,
+    err_message_p1: SimulatorError,
+    err_message_p2: SimulatorError,
+    runner1_error: bool,
+    runner2_error: bool,
+) -> response::GameStatus {
+    let (err_typep1, errorp1) = match err_message_p1 {
+        SimulatorError::RuntimeError(e) => ("Runtime Error!".to_owned(), e),
+        SimulatorError::CompilationError(e) => ("Compilation Error!".to_owned(), e),
+        SimulatorError::FifoCreationError(e) => ("Process Communication Error!".to_owned(), e),
+        SimulatorError::UnidentifiedError(e) => {
+            ("Unidentified Error. Contact the POCs!".to_owned(), e)
+        }
+        SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
+        SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
+        SimulatorError::RabbitMqError(e) => ("RabbitMq Error!".to_owned(), e),
+        SimulatorError::Player1Error(e) => ("Player1 Error!".to_owned(), e),
+        SimulatorError::Player2Error(e) => ("Player2 Error!".to_owned(), e),
+    };
+    let (err_typep2, errorp2) = match err_message_p2 {
+        SimulatorError::RuntimeError(e) => ("Runtime Error!".to_owned(), e),
+        SimulatorError::CompilationError(e) => ("Compilation Error!".to_owned(), e),
+        SimulatorError::FifoCreationError(e) => ("Process Communication Error!".to_owned(), e),
+        SimulatorError::UnidentifiedError(e) => {
+            ("Unidentified Error. Contact the POCs!".to_owned(), e)
+        }
+        SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
+        SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
+        SimulatorError::RabbitMqError(e) => ("RabbitMq Error!".to_owned(), e),
+        SimulatorError::Player1Error(e) => ("Player1 Error!".to_owned(), e),
+        SimulatorError::Player2Error(e) => ("Player2 Error!".to_owned(), e),
+    };
+
+    let errorp1 = errorp1
+        .lines()
+        .map(|x| format!("ERRORS, {x}"))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    let errorp2 = errorp2
+        .lines()
+        .map(|x| format!("ERRORS, {x}"))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+
+    response::GameStatus::new_pvp(
+        game_id,
+        response::GameStatusEnum::EXECUTE_ERROR,
+        Some(GameResultPvP {
+            score: 0,
+            has_errors: runner1_error,
+            log: format!("ERRORS, ERROR TYPE: {err_typep1}\nERRORS, ERROR LOG:\n{errorp1}\n"),
+        }),
+        Some(GameResultPvP {
+            score: 0,
+            has_errors: runner2_error,
+            log: format!("ERRORS, ERROR TYPE: {err_typep2}\nERRORS, ERROR LOG:\n{errorp2}\n"),
+        }),
+    )
+}
+
 pub fn create_executing_response(game_id: &String) -> response::GameStatus {
     response::GameStatus::new_normal(game_id.to_owned(), GameStatusEnum::EXECUTING, None)
 }
 
-pub fn create_error_response(game_id: String, err: SimulatorError) -> response::GameStatus {
+pub fn create_normal_error_response(game_id: String, err: SimulatorError) -> response::GameStatus {
     error!("Error in execution: {:?}", err);
     let (err_type, error) = match err {
         SimulatorError::RuntimeError(e) => ("Runtime Error!".to_owned(), e),
@@ -215,6 +277,8 @@ pub fn create_error_response(game_id: String, err: SimulatorError) -> response::
         SimulatorError::TimeOutError(e) => ("Timeout Error!".to_owned(), e),
         SimulatorError::EpollError(e) => ("Event Creation Error!".to_owned(), e),
         SimulatorError::RabbitMqError(e) => ("RabbitMq Error!".to_owned(), e),
+        SimulatorError::Player1Error(e) => ("Player1 Error!".to_owned(), e),
+        SimulatorError::Player2Error(e) => ("Player2 Error!".to_owned(), e),
     };
 
     let error = error

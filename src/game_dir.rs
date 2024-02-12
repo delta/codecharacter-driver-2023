@@ -12,7 +12,6 @@ impl GameDir {
             info!("Failed to create dir /tmp/{game_id}: {e}");
             return None;
         }
-        info!("Created dir /tmp/{game_id}");
         Some(GameDir {
             full_path: format!("/tmp/{game_id}"),
         })

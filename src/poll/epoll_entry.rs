@@ -17,7 +17,7 @@ use std::process::Child;
 use super::epoll::CallbackMessage;
 use super::epoll::Pollable;
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum ProcessType {
     Runner,
     RunnerPlayer1,
@@ -117,6 +117,7 @@ impl ProcessOutput {
     }
 }
 
+#[derive(Debug)]
 pub enum EpollEntryType {
     Process(Process),
     StdErr(ProcessOutput),

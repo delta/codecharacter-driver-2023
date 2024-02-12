@@ -4,7 +4,8 @@ use log::info;
 use nix::sys::epoll::EpollFlags;
 
 use crate::{
-    create_error_response, create_final_pvp_response, create_final_response,
+    create_final_pvp_response, create_final_response, create_normal_error_response,
+    create_pvp_error_response,
     error::SimulatorError,
     fifo::Fifo,
     game_dir::GameDir,
@@ -24,7 +25,7 @@ pub trait Handler {
 
 fn handle_event(
     epoll_handle: &mut EpollGeneric<EpollEntryType>,
-) -> Result<Vec<Option<ProcessOutput>>, SimulatorError> {
+) -> Result<(Vec<Option<ProcessOutput>>, Vec<Option<ProcessType>>), SimulatorError> {
     let events = epoll_handle.poll(
         env::var("EPOLL_WAIT_TIMEOUT")
             .unwrap()
@@ -33,6 +34,7 @@ fn handle_event(
         epoll_handle.get_registered_fds().len(),
     )?;
     let mut res = vec![];
+    let mut errors = vec![];
     for e in events {
         match epoll_handle.process_event(e)? {
             CallbackMessage::Unregister(fd) => {
@@ -67,17 +69,18 @@ fn handle_event(
                                     EpollEntryType::StdErr(_) => unreachable!(),
                                 }
                             });
-                            return Err(match exit_status.code() {
-                            // 137 => Stands for container killing itself (by SIGKILL)
-                            // that will be due to contraint provided
-                            None | Some(137) => SimulatorError::TimeOutError(
-                                "Process took longer than the specified time to execute, so it was killed"
-                                    .to_owned(),
-                            ),
-                            Some(code) => SimulatorError::RuntimeError(format!(
-                                "Program exited with non zero exit code: {code}"
-                            )),
-                            });
+                            match p.get_type() {
+                                &ProcessType::Runner => errors.push(Some(ProcessType::Runner)),
+                                &ProcessType::RunnerPlayer1 => {
+                                    errors.push(Some(ProcessType::RunnerPlayer1))
+                                }
+                                &ProcessType::RunnerPlayer2 => {
+                                    errors.push(Some(ProcessType::RunnerPlayer2))
+                                }
+                                &ProcessType::Simulator => {
+                                    errors.push(Some(ProcessType::Simulator))
+                                }
+                            }
                         }
                     }
                 }
@@ -87,7 +90,7 @@ fn handle_event(
             }
         }
     }
-    Ok(res)
+    Ok((res, errors))
 }
 
 fn get_runner(
@@ -124,7 +127,7 @@ impl Handler for NormalGameRequest {
         let game_dir_handle = GameDir::new(&self.game_id);
 
         if game_dir_handle.is_none() {
-            return create_error_response(
+            return create_normal_error_response(
                 self.game_id,
                 SimulatorError::UnidentifiedError("Failed to create game directory".to_owned()),
             );
@@ -204,18 +207,38 @@ impl Handler for NormalGameRequest {
 
                 let mut event_handler = match initialize() {
                     Ok(handler) => handler,
-                    Err(err) => return create_error_response(self.game_id, err),
+                    Err(err) => return create_normal_error_response(self.game_id, err),
                 };
 
                 let mut outputs: Vec<ProcessOutput> = vec![];
 
                 while !event_handler.is_empty() {
-                    let result = handle_event(&mut event_handler);
-                    match result {
-                        Ok(processing_outputs) => {
-                            outputs.extend(processing_outputs.into_iter().flatten())
+                    match handle_event(&mut event_handler) {
+                        Ok((result, errors)) => {
+                            outputs.extend(result.into_iter().flatten());
+                            if !errors.is_empty() {
+                                while !outputs.is_empty() {
+                                    let process = outputs.remove(0);
+                                    match process.process_type() {
+                                        ProcessType::Runner => {
+                                            return create_normal_error_response(
+                                                self.game_id,
+                                                SimulatorError::RuntimeError(process.output()),
+                                            )
+                                        }
+                                        _ => {
+                                            return create_normal_error_response(self.game_id, SimulatorError::RuntimeError("couldnt communicate with simulator check syntax".to_owned()));
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        Err(err) => return create_error_response(self.game_id, err),
+                        Err(_) => {
+                            return create_normal_error_response(
+                                self.game_id,
+                                SimulatorError::RuntimeError("Unknown error occured".to_owned()),
+                            );
+                        }
                     }
                 }
 
@@ -226,7 +249,7 @@ impl Handler for NormalGameRequest {
                     ProcessType::Runner => (process1.output(), process2.output()),
                     ProcessType::Simulator => (process2.output(), process1.output()),
                     _ => {
-                        return create_error_response(
+                        return create_normal_error_response(
                             self.game_id.to_owned(),
                             SimulatorError::UnidentifiedError("Failed to map outputs".to_owned()),
                         );
@@ -242,7 +265,7 @@ impl Handler for NormalGameRequest {
                 )
             }
 
-            (Err(e), _) | (_, Err(e)) => create_error_response(self.game_id, e),
+            (Err(e), _) | (_, Err(e)) => create_normal_error_response(self.game_id, e),
         }
     }
 }
@@ -256,9 +279,12 @@ impl Handler for PvPGameRequest {
         let game_dir_handle = GameDir::new(&self.game_id);
 
         if game_dir_handle.is_none() {
-            return create_error_response(
+            return create_pvp_error_response(
                 self.game_id,
                 SimulatorError::UnidentifiedError("Failed to create game directory".to_owned()),
+                SimulatorError::UnidentifiedError("Failed to create game directory".to_owned()),
+                true,
+                true,
             );
         }
 
@@ -326,8 +352,24 @@ impl Handler for PvPGameRequest {
                     &player2_dir.to_string(),
                 );
                 let initialize = || -> Result<_, SimulatorError> {
-                    let mut player1_process = runner1.run(p1_r, p1_w, GameType::PvPGame)?;
-                    let mut player2_process = runner2.run(p2_r, p2_w, GameType::PvPGame)?;
+                    let mut player1_process =
+                        runner1
+                            .run(p1_r, p1_w, GameType::PvPGame)
+                            .map_err(|e| match e {
+                                SimulatorError::CompilationError(e) => {
+                                    SimulatorError::Player1Error(e)
+                                }
+                                _ => SimulatorError::Player1Error("Couldnt compile".to_owned()),
+                            })?;
+                    let mut player2_process =
+                        runner2
+                            .run(p2_r, p2_w, GameType::PvPGame)
+                            .map_err(|e| match e {
+                                SimulatorError::CompilationError(e) => {
+                                    SimulatorError::Player2Error(e)
+                                }
+                                _ => SimulatorError::Player2Error("Couldnt compile".to_owned()),
+                            })?;
                     let simulator = simulator::Simulator::new(self.game_id.to_string());
                     let mut sim_process =
                         simulator.run_pvp(sim_r, sim_w, p1_in, p3_in, p2_in, p4_in)?;
@@ -376,25 +418,99 @@ impl Handler for PvPGameRequest {
                     event_handler
                         .register(sim_output, EpollFlags::EPOLLIN | EpollFlags::EPOLLHUP)
                         .map_err(SimulatorError::from)?;
-
                     Ok(event_handler)
                 };
 
                 let mut event_handler = match initialize() {
                     Ok(handler) => handler,
-                    Err(err) => return create_error_response(self.game_id.to_owned(), err),
+                    Err(err) => match err {
+                        SimulatorError::Player1Error(error) => {
+                            return create_pvp_error_response(
+                                self.game_id,
+                                SimulatorError::CompilationError(format!("{error}")),
+                                SimulatorError::CompilationError(
+                                    "Other player couldnt compile".to_owned(),
+                                ),
+                                true,
+                                false,
+                            )
+                        }
+                        SimulatorError::Player2Error(error) => {
+                            return create_pvp_error_response(
+                                self.game_id,
+                                SimulatorError::CompilationError(
+                                    "Other player couldnt compile".to_owned(),
+                                ),
+                                SimulatorError::CompilationError(format!("{error}")),
+                                false,
+                                true,
+                            )
+                        }
+                        _ => {
+                            return create_pvp_error_response(
+                                self.game_id.to_owned(),
+                                err.clone(),
+                                err,
+                                true,
+                                true,
+                            )
+                        }
+                    },
                 };
 
                 let mut outputs: Vec<ProcessOutput> = vec![];
+                let mut all_errors: Vec<ProcessType> = vec![];
 
                 while !event_handler.is_empty() {
-                    let result = handle_event(&mut event_handler);
-                    match result {
-                        Ok(processing_outputs) => {
-                            outputs.extend(processing_outputs.into_iter().flatten())
+                    match handle_event(&mut event_handler) {
+                        Ok((result, errors)) => {
+                            outputs.extend(result.into_iter().flatten());
+                            all_errors.extend(errors.into_iter().flatten());
                         }
-                        Err(err) => return create_error_response(self.game_id.to_owned(), err),
+                        Err(_) => {
+                            // Handle the case where handle_event returns an error
+                            // Adjust the error message as needed
+                            return create_pvp_error_response(
+                                self.game_id,
+                                SimulatorError::RuntimeError("Unknown runtime error".to_owned()),
+                                SimulatorError::RuntimeError("Unknown runtime error".to_owned()),
+                                true,
+                                true,
+                            );
+                        }
                     }
+                }
+
+                if all_errors.contains(&ProcessType::RunnerPlayer1) {
+                    return create_pvp_error_response(
+                        self.game_id,
+                        SimulatorError::RuntimeError(
+                            outputs
+                                .into_iter()
+                                .filter(|x| x.process_type() == &ProcessType::RunnerPlayer1)
+                                .map(|x| x.output())
+                                .collect::<String>(),
+                        ),
+                        SimulatorError::RuntimeError("the other player threw an error".to_owned()),
+                        true,
+                        false,
+                    );
+                }
+
+                if all_errors.contains(&ProcessType::RunnerPlayer2) {
+                    return create_pvp_error_response(
+                        self.game_id,
+                        SimulatorError::RuntimeError("the other player threw an error".to_owned()),
+                        SimulatorError::RuntimeError(
+                            outputs
+                                .into_iter()
+                                .filter(|x| x.process_type() == &ProcessType::RunnerPlayer2)
+                                .map(|x| x.output())
+                                .collect::<String>(),
+                        ),
+                        false,
+                        true,
+                    );
                 }
 
                 let process1 = outputs.remove(0);
@@ -437,9 +553,12 @@ impl Handler for PvPGameRequest {
                         ProcessType::RunnerPlayer1,
                     ) => (process3.output(), process2.output(), process1.output()),
                     _ => {
-                        return create_error_response(
+                        return create_pvp_error_response(
                             self.game_id.to_owned(),
                             SimulatorError::UnidentifiedError("Failed to map outputs".to_owned()),
+                            SimulatorError::UnidentifiedError("Failed to map outputs".to_owned()),
+                            true,
+                            true,
                         );
                     }
                 };
@@ -457,7 +576,9 @@ impl Handler for PvPGameRequest {
             | (_, Err(e), _, _, _)
             | (_, _, Err(e), _, _)
             | (_, _, _, Err(e), _)
-            | (_, _, _, _, Err(e)) => create_error_response(self.game_id, e),
+            | (_, _, _, _, Err(e)) => {
+                create_pvp_error_response(self.game_id, e.clone(), e, true, true)
+            }
         }
     }
 }

@@ -47,7 +47,6 @@ impl Runnable for Runner {
                     env::var("RUNTIME_TIME_LIMIT").unwrap(),
                     env::var("RUNTIME_TIME_LIMIT").unwrap()
                 ),
-                "--rm",
                 "--name",
                 &format!(
                     "{}_{}_python_runner",
