@@ -205,6 +205,7 @@ pub fn create_pvp_error_response(
     runner1_error: bool,
     runner2_error: bool,
 ) -> response::GameStatus {
+    error!("Error in execution: p1 error {:?} p2 error {:?} ", err_message_p1, err_message_p2);
     let (err_typep1, errorp1) = match err_message_p1 {
         SimulatorError::RuntimeError(e) => ("Runtime Error!".to_owned(), e),
         SimulatorError::CompilationError(e) => ("Compilation Error!".to_owned(), e),

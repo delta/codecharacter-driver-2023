@@ -9,7 +9,6 @@ impl GameDir {
     pub fn new(game_id: &str) -> Option<Self> {
         let err = std::fs::create_dir(format!("/tmp/{game_id}"));
         if let Err(e) = err {
-            info!("Failed to create dir /tmp/{game_id}: {e}");
             return None;
         }
         Some(GameDir {
