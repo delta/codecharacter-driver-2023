@@ -41,6 +41,7 @@ impl Simulator {
                     env::var("RUNTIME_TIME_LIMIT").unwrap()
                 ),
                 "--name",
+                "--rm",
                 &format!("{}_simulator", self.game_id),
                 "-i",
                 "-v",

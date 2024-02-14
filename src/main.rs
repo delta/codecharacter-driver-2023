@@ -6,7 +6,7 @@ use cc_driver::{
     mq::{consumer, Publisher},
     request::GameRequest,
 };
-use log::LevelFilter;
+use log::{info, LevelFilter};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
@@ -28,6 +28,7 @@ fn worker_fn(msg_receiver: crossbeam_channel::Receiver<GameRequest>, publisher: 
 }
 
 fn main() {
+    info!("Starting driver");
     let level = log::LevelFilter::Info;
     let file_path = "driver.log";
 
